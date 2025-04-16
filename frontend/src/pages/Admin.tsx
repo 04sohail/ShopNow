@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Home,
     Users,
@@ -11,14 +11,21 @@ import {
     ChevronRight,
     Package,
     Menu,
-    X
+    X,
+    Phone,
+    Eye,
+    EyeOff,
+    Mail,
+    CheckCircle
 } from 'lucide-react';
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id } from '../services/admin/user_controller';
+import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id, add_new_user, get_user_by_id, update_user_by_id } from '../services/admin/user_controller';
 import { get_all_products_count, get_all_active_products, get_all_in_active_products } from '../services/admin/products_controller';
 import { AdminUsers } from '../types/types';
 import { Link } from 'react-router-dom';
+import { useFormik } from 'formik';
+import { adminUpdateUserSchema, signupSchema } from '../utils/validations';
 
 
 export default function AdminDashboard() {
@@ -30,6 +37,19 @@ export default function AdminDashboard() {
     const [inactiveUser, setInactiveUser] = useState(0);
     const [activeProduct, setActiveProduct] = useState(0);
     const [inactiveProduct, setInactiveProduct] = useState(0);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<number | null>(null);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+    const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+    const [currentUserPage, setCurrentUserPage] = useState(1);
+    const [currentProductPage, setCurrentProductPage] = useState(1);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activePage, setActivePage] = useState('home');
+    const [isOpen, setIsOpen] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [userToUpdate, setUserToUpdate] = useState<number | null>(null);
 
     // Fetch all required data when the component mounts
     useEffect(() => {
@@ -63,8 +83,6 @@ export default function AdminDashboard() {
         fetchData();
     }, []);
 
-    console.log(users[0]?.first_name);
-
     const stats = {
         totalUsers: totalUser,
         activeUsers: activeUser,
@@ -83,14 +101,6 @@ export default function AdminDashboard() {
         { name: 'Active Products', value: stats.activeProducts },
         { name: 'Removed Products', value: stats.removedProducts }
     ];
-    // State for active page
-    const [activePage, setActivePage] = useState('home');
-
-    // State for mobile menu
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-    // User data
-    console.log(users);
 
     // Dummy product data
     const [products, setProducts] = useState([
@@ -229,8 +239,7 @@ export default function AdminDashboard() {
     ]);
 
     // Pagination state
-    const [currentUserPage, setCurrentUserPage] = useState(1);
-    const [currentProductPage, setCurrentProductPage] = useState(1);
+
     const itemsPerPage = 10;
 
     // Calculate pagination
@@ -267,8 +276,7 @@ export default function AdminDashboard() {
     };
 
     // Handle user deletion
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [userToDelete, setUserToDelete] = useState<number | null>(null);
+
     const handleDeleteUser = () => {
         if (userToDelete !== null) {
             delete_user_by_id(userToDelete);
@@ -298,32 +306,578 @@ export default function AdminDashboard() {
         { name: 'Products', icon: <ShoppingBag size={20} />, id: 'products' }
     ];
 
+
+    // ADDING USER
+    const errorRef = useRef(null);
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
+    const signupInitialValues = {
+        first_name: "",
+        last_name: "",
+        email_address: "",
+        password: "",
+        mobile_number: "",
+        user_type: ""
+    };
+
+
+    // Effect to handle notification auto-close and switching to login
+    useEffect(() => {
+        let timer;
+        if (showSuccessNotification) {
+            // First timer: wait a bit to make sure the notification is visible
+            timer = setTimeout(() => {
+                // Second timer: auto close the notification and switch to login
+                const switchTimer = setTimeout(() => {
+                    setShowSuccessNotification(false);
+                    setIsOpen(false); // Close the signup modal
+                }, 2000); // 2 seconds display time for notification
+
+                return () => clearTimeout(switchTimer);
+            }, 200); // Small delay to ensure animation runs properly
+        }
+        return () => clearTimeout(timer);
+    }, [showSuccessNotification]);
+    const handleCloseNotification = () => {
+        setShowSuccessNotification(false);
+    };
+    // Signup form handling
+    const signupFormik = useFormik({
+        initialValues: signupInitialValues,
+        validationSchema: signupSchema,
+        validateOnChange: true,
+        validateOnBlur: true,
+        onSubmit: async (values, { setSubmitting, resetForm }) => {
+            try {
+                setSubmitError(null);
+                // API CALL
+                await add_new_user(values);
+
+                // Show success notification at the top
+                setShowSuccessNotification(true);
+                resetForm();
+
+                // Notification will automatically close and switch to login after timeout
+            } catch (error) {
+                console.error("Error during login:", error);
+                // Handle backend error messages
+                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+                } else {
+                    setSubmitError("An unexpected error occurred. Please try again.");
+                }
+            } finally {
+                setSubmitting(false);
+            }
+        }
+    });
+    const handleSignupSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        signupFormik.setTouched({
+            first_name: true,
+            last_name: true,
+            email_address: true,
+            password: true,
+            mobile_number: true,
+            user_type: true
+        });
+
+        // Add a small delay to ensure touched state is updated
+        setTimeout(() => {
+            signupFormik.handleSubmit();
+        }, 0);
+    };
+
+
+    // UPDATING USER
+    ////////////////////////////
+    // Effect to handle notification auto-close and switching to login
+    useEffect(() => {
+        let timer;
+        if (showUpdateNotification) {
+            // First timer: wait a bit to make sure the notification is visible
+            timer = setTimeout(() => {
+                // Second timer: auto close the notification and switch to login
+                const switchTimer = setTimeout(() => {
+                    setShowUpdateNotification(false);
+                    setIsUpdateModalOpen(false); // Close the signup modal
+                }, 2000); // 2 seconds display time for notification
+
+                return () => clearTimeout(switchTimer);
+            }, 200); // Small delay to ensure animation runs properly
+        }
+        return () => clearTimeout(timer);
+    }, [showUpdateNotification]);
+    const handleUpdateCloseNotification = () => {
+        setShowUpdateNotification(false);
+    };
+    const updateInitialValues = {
+        first_name: "",
+        last_name: "",
+        email_address: "",
+        mobile_number: "",
+        user_type: ""
+    };
+
+    const updateFormik = useFormik({
+        initialValues: updateInitialValues,
+        validationSchema: adminUpdateUserSchema,
+        validateOnChange: true,
+        validateOnBlur: true,
+        onSubmit: async (values, { setSubmitting, resetForm }) => {
+            try {
+                setSubmitError(null);
+                // API CALL
+                update_user_by_id(userToUpdate!, values);
+                // Show success notification at the top
+                setIsUpdateModalOpen(false);
+                setShowUpdateNotification(true);
+                resetForm();
+                // Notification will automatically close and switch to login after timeout
+            } catch (error) {
+                console.error("Error during login:", error);
+                // Handle backend error messages
+                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+                } else {
+                    setSubmitError("An unexpected error occurred. Please try again.");
+                }
+            } finally {
+                setSubmitting(false);
+            }
+        }
+    });
+
+    const handleUpdateModalClose = () => {
+        setIsUpdateModalOpen(false);
+        setUserToUpdate(null);
+    };
+    const handleEditClick = async (id: number) => {
+        const response = await get_user_by_id(id)
+        updateFormik.setValues({
+            first_name: response.first_name,
+            last_name: response.last_name,
+            email_address: response.email_address,
+            mobile_number: response.mobile_number,
+            user_type: response.user_type
+        });
+        setUserToUpdate(id);
+        setIsUpdateModalOpen(true);
+    };
+    const handleUpdateSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitError(null);
+        signupFormik.setTouched({
+            first_name: true,
+            last_name: true,
+            email_address: true,
+            password: true,
+            mobile_number: true,
+            user_type: true
+        });
+        // Add a small delay to ensure touched state is updated
+        setTimeout(() => {
+            updateFormik.handleSubmit();
+        }, 0);
+    };
+
     return (
         <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
-            {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            Are you sure you want to delete this user? This action cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={handleCancelDelete}
-                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteUser}
-                                className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700 cursor-pointer"
-                            >
-                                Delete
-                            </button>
+            {showSuccessNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">Registration Successful!</p>
                         </div>
+                        <button
+                            onClick={handleCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
                     </div>
                 </div>
             )}
+            {showUpdateNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">User Updated Successfully!</p>
+                        </div>
+                        <button
+                            onClick={handleUpdateCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {isOpen && (
+                <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
+                        <div className="flex justify-between items-center p-4 border-b mb-5">
+                            <h2 className="text-xl font-semibold text-gray-800">Create Account</h2>
+                            <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-gray-700">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        {submitError && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                {submitError}
+                            </div>
+                        )}
+                        <form className="space-y-6" onSubmit={handleSignupSubmit}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                                    <input
+                                        id="first_name"
+                                        name="first_name"
+                                        type="text"
+                                        className={`block w-full rounded-lg border ${signupFormik.touched.first_name && signupFormik.errors.first_name
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                        placeholder="First Name"
+                                        value={signupFormik.values.first_name}
+                                        onChange={signupFormik.handleChange}
+                                        onBlur={signupFormik.handleBlur}
+                                    />
+                                    {signupFormik.touched.first_name && signupFormik.errors.first_name && (
+                                        <p className="mt-1 text-sm text-red-600">{signupFormik.errors.first_name}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                                    <input
+                                        id="last_name"
+                                        name="last_name"
+                                        type="text"
+                                        className={`block w-full rounded-lg border ${signupFormik.touched.last_name && signupFormik.errors.last_name
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                        placeholder="Last Name"
+                                        value={signupFormik.values.last_name}
+                                        onChange={signupFormik.handleChange}
+                                        onBlur={signupFormik.handleBlur}
+                                    />
+                                    {signupFormik.touched.last_name && signupFormik.errors.last_name && (
+                                        <p className="mt-1 text-sm text-red-600">{signupFormik.errors.last_name}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="email_address" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Mail className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                    <input
+                                        id="email_address"
+                                        name="email_address"
+                                        type="text"
+                                        autoComplete="email"
+                                        className={`pl-10 block w-full rounded-lg border ${signupFormik.touched.email_address && signupFormik.errors.email_address
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                        placeholder="Email Address"
+                                        value={signupFormik.values.email_address}
+                                        onChange={signupFormik.handleChange}
+                                        onBlur={signupFormik.handleBlur}
+                                    />
+                                </div>
+                                {signupFormik.touched.email_address && signupFormik.errors.email_address && (
+                                    <p className="mt-1 text-sm text-red-600">{signupFormik.errors.email_address}</p>
+                                )}
+                                <p className="text-red-600 text-sm mt-1 hidden" ref={errorRef}>User Already Exists</p>
+                            </div>
+
+                            <div>
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <div className="relative">
+                                    <input
+                                        id="password"
+                                        name="password"
+                                        type={showPassword ? "text" : "password"}
+                                        autoComplete="new-password"
+                                        className={`block w-full rounded-lg border ${signupFormik.touched.password && signupFormik.errors.password
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                        placeholder="Password"
+                                        value={signupFormik.values.password}
+                                        onChange={signupFormik.handleChange}
+                                        onBlur={signupFormik.handleBlur}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                                        onClick={togglePasswordVisibility}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="h-5 w-5 text-gray-400" />
+                                        ) : (
+                                            <Eye className="h-5 w-5 text-gray-400" />
+                                        )}
+                                    </button>
+                                </div>
+                                {signupFormik.touched.password && signupFormik.errors.password && (
+                                    <p className="mt-1 text-sm text-red-600">{signupFormik.errors.password}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Phone className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                    <input
+                                        id="mobile_number"
+                                        name="mobile_number"
+                                        type="tel"
+                                        maxLength={10}
+                                        pattern="[0-9]*"
+                                        inputMode="numeric"
+                                        className={`pl-10 block w-full rounded-lg border ${signupFormik.touched.mobile_number && signupFormik.errors.mobile_number
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                        placeholder="Phone Number"
+                                        value={signupFormik.values.mobile_number}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            signupFormik.setFieldValue('mobile_number', value);
+                                        }}
+                                        onBlur={signupFormik.handleBlur}
+                                    />
+                                </div>
+                                {signupFormik.touched.mobile_number && signupFormik.errors.mobile_number && (
+                                    <p className="mt-1 text-sm text-red-600">{signupFormik.errors.mobile_number}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label htmlFor="user_type" className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+                                <select
+                                    id="user_type"
+                                    name="user_type"
+                                    className={`block w-full rounded-lg border ${signupFormik.touched.user_type && signupFormik.errors.user_type
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    value={signupFormik.values.user_type}
+                                    onChange={signupFormik.handleChange}
+                                    onBlur={signupFormik.handleBlur}
+                                >
+                                    <option value="" disabled>Select User Type</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="free-user">Free User</option>
+                                </select>
+                                {signupFormik.touched.user_type && signupFormik.errors.user_type && (
+                                    <p className="mt-1 text-sm text-red-600">{signupFormik.errors.user_type}</p>
+                                )}
+                            </div>
+                            <div>
+                                <button
+                                    type="submit"
+                                    disabled={signupFormik.isSubmitting}
+                                    className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition duration-150 ease-in-out cursor-pointer disabled:opacity-70"
+                                >
+                                    {signupFormik.isSubmitting ? "Creating Account..." : "Create Account"}
+                                </button>
+                            </div>
+                        </form>
+
+                    </div>
+                </div>
+            )
+            }
+            {
+                isDeleteModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-xs">
+                        <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Are you sure you want to delete this user? This action cannot be undone.
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={handleCancelDelete}
+                                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteUser}
+                                    className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700 cursor-pointer"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            {/* UPDATE MODAL START */}
+            {
+                isUpdateModalOpen && (
+                    <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
+                            <div className="flex justify-between items-center p-4 border-b mb-5">
+                                <h2 className="text-xl font-semibold text-gray-800">Update User</h2>
+                                <button onClick={handleUpdateModalClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            {submitError && (
+                                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                    {submitError}
+                                </div>
+                            )}
+                            <form className="space-y-6" onSubmit={handleUpdateSubmit}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                                        <input
+                                            id="first_name"
+                                            name="first_name"
+                                            type="text"
+                                            className={`block w-full rounded-lg border ${updateFormik.touched.first_name && updateFormik.errors.first_name
+                                                ? 'border-red-500 focus:ring-red-500'
+                                                : 'border-gray-300 focus:ring-indigo-500'
+                                                } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                            placeholder="First Name"
+                                            value={updateFormik.values.first_name}
+                                            onChange={updateFormik.handleChange}
+                                            onBlur={updateFormik.handleBlur}
+                                        />
+                                        {updateFormik.touched.first_name && updateFormik.errors.first_name && (
+                                            <p className="mt-1 text-sm text-red-600">{updateFormik.errors.first_name}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                                        <input
+                                            id="last_name"
+                                            name="last_name"
+                                            type="text"
+                                            className={`block w-full rounded-lg border ${updateFormik.touched.last_name && updateFormik.errors.last_name
+                                                ? 'border-red-500 focus:ring-red-500'
+                                                : 'border-gray-300 focus:ring-indigo-500'
+                                                } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                            placeholder="Last Name"
+                                            value={updateFormik.values.last_name}
+                                            onChange={updateFormik.handleChange}
+                                            onBlur={updateFormik.handleBlur}
+                                        />
+                                        {updateFormik.touched.last_name && updateFormik.errors.last_name && (
+                                            <p className="mt-1 text-sm text-red-600">{updateFormik.errors.last_name}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="email_address" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Mail className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                        <input
+                                            id="email_address"
+                                            name="email_address"
+                                            type="text"
+                                            autoComplete="email"
+                                            className={`pl-10 block w-full rounded-lg border ${updateFormik.touched.email_address && updateFormik.errors.email_address
+                                                ? 'border-red-500 focus:ring-red-500'
+                                                : 'border-gray-300 focus:ring-indigo-500'
+                                                } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                            placeholder="Email Address"
+                                            value={updateFormik.values.email_address}
+                                            onChange={updateFormik.handleChange}
+                                            onBlur={updateFormik.handleBlur}
+                                        />
+                                    </div>
+                                    {updateFormik.touched.email_address && updateFormik.errors.email_address && (
+                                        <p className="mt-1 text-sm text-red-600">{updateFormik.errors.email_address}</p>
+                                    )}
+                                    <p className="text-red-600 text-sm mt-1 hidden" ref={errorRef}>User Already Exists</p>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Phone className="h-5 w-5 text-gray-400" />
+                                        </div>
+                                        <input
+                                            id="mobile_number"
+                                            name="mobile_number"
+                                            type="tel"
+                                            maxLength={10}
+                                            pattern="[0-9]*"
+                                            inputMode="numeric"
+                                            className={`pl-10 block w-full rounded-lg border ${updateFormik.touched.mobile_number && updateFormik.errors.mobile_number
+                                                ? 'border-red-500 focus:ring-red-500'
+                                                : 'border-gray-300 focus:ring-indigo-500'
+                                                } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                            placeholder="Phone Number"
+                                            value={updateFormik.values.mobile_number}
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/\D/g, '');
+                                                updateFormik.setFieldValue('mobile_number', value);
+                                            }}
+                                            onBlur={updateFormik.handleBlur}
+                                        />
+                                    </div>
+                                    {updateFormik.touched.mobile_number && updateFormik.errors.mobile_number && (
+                                        <p className="mt-1 text-sm text-red-600">{updateFormik.errors.mobile_number}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label htmlFor="user_type" className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+                                    <select
+                                        id="user_type"
+                                        name="user_type"
+                                        className={`block w-full rounded-lg border ${updateFormik.touched.user_type && updateFormik.errors.user_type
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:ring-indigo-500'
+                                            } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                        value={updateFormik.values.user_type}
+                                        onChange={updateFormik.handleChange}
+                                        onBlur={updateFormik.handleBlur}
+                                    >
+                                        <option value="" disabled>Select User Type</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="free_user">Free User</option>
+                                    </select>
+                                    {updateFormik.touched.user_type && updateFormik.errors.user_type && (
+                                        <p className="mt-1 text-sm text-red-600">{updateFormik.errors.user_type}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <button
+                                        type="submit"
+                                        disabled={updateFormik.isSubmitting}
+                                        className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition duration-150 ease-in-out cursor-pointer disabled:opacity-70"
+                                    >
+                                        {updateFormik.isSubmitting ? "Updating User..." : "Update User"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+            {/* UPDATE MODAL END */}
             {/* Mobile menu button */}
             <div className="md:hidden fixed top-4 left-4 z-50">
                 <button
@@ -495,7 +1049,7 @@ export default function AdminDashboard() {
                             <div className="p-6 border-b border-gray-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-bold text-gray-800">Users List</h3>
-                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
+                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsOpen(true)}>
                                         Add New User
                                     </button>
                                 </div>
@@ -532,7 +1086,7 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <div className="flex items-center gap-3">
-                                                        <button className="text-indigo-600 hover:text-indigo-900">
+                                                        <button className="text-indigo-600 hover:text-indigo-900 cursor-pointer" onClick={() => handleEditClick(user.id)}>
                                                             <Edit size={18} />
                                                         </button>
                                                         <button
@@ -710,5 +1264,5 @@ export default function AdminDashboard() {
                     )}
                 </main>
             </div>
-        </div>);
+        </div >);
 }

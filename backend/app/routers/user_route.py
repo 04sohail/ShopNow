@@ -5,7 +5,7 @@ from ..models import user
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
 
-router = APIRouter(prefix="/users", )
+router = APIRouter(prefix="/users")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -14,23 +14,28 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
     """Create a new user."""
     # Hashing the password
-    print(form_data)
-    hashed_password = pwd_context.hash(form_data.password)
-    print("########################################",hashed_password)
     try:
+        hashed_password = pwd_context.hash(form_data.password)
+
         # Check if the user already exists by email
-        existing_user = db.query(user.User).filter(user.User.email_address == form_data.email_address).first()
+        existing_user = db.query(user.User).filter(
+            user.User.email_address.ilike(form_data.email_address.strip())
+        ).first()
+        
         if existing_user:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, 
+                detail="User already exists. Please use a different email address."
+            )
 
         # Create a new user in the database
         new_user = user.User(
-            first_name=form_data.first_name,
-            last_name=form_data.last_name,
-            mobile_number=form_data.mobile_number,
-            email_address=form_data.email_address,
-            password=hashed_password, 
-        ) 
+            first_name=form_data.first_name.strip(),
+            last_name=form_data.last_name.strip(),
+            mobile_number=form_data.mobile_number.strip(),
+            email_address=form_data.email_address.strip(),
+            password=hashed_password,
+        )
 
         # Add the user to the session and commit
         db.add(new_user)
@@ -39,13 +44,21 @@ def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
 
         # Return a success response with user info
         return SuccessResponse(
-            message="Registration Success",
+            message="Registration Successful",
             data=new_user.info()
         )
 
+    except HTTPException as http_exc:
+        # Reraise HTTP exceptions directly
+        raise http_exc
+    
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
+        # Log unexpected exceptions and raise a generic HTTP 500 error
+        print(f"Unexpected error during registration: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="An unexpected error occurred during registration. Please try again later."
+        )
 
 
 # LOGIN USER

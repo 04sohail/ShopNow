@@ -3,7 +3,7 @@ from ..schemas import SuccessResponse
 from ..models import user, inventory
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
-from ..schemas import Admin_User_Registration
+from ..schemas import Admin_User_Registration, Admin_edit_user
 from passlib.context import CryptContext
 
 router = APIRouter(prefix="/admin", )
@@ -201,7 +201,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
 
 # ADDING NEW USER 
-@router.post("/register/", description="This is used to create new user or user registration", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/user/register/", description="This is used to create new user or user registration", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
 def create_user(form_data: Admin_User_Registration, db: Session = Depends(get_db)):
     """Create a new user."""
     # Hashing the password
@@ -220,6 +220,7 @@ def create_user(form_data: Admin_User_Registration, db: Session = Depends(get_db
             mobile_number=form_data.mobile_number,
             email_address=form_data.email_address,
             password=hashed_password, 
+            user_type=form_data.user_type,
         ) 
 
         # Add the user to the session and commit
@@ -231,6 +232,63 @@ def create_user(form_data: Admin_User_Registration, db: Session = Depends(get_db
         return SuccessResponse(
             message="Registration Success",
             data=new_user.info()
+        )
+    except HTTPException as http_exc:
+        # Reraise HTTP exceptions directly
+        raise http_exc
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
+
+# UPDATING USER 
+# GETTING USER BY ID
+@router.get("/user/{user_id}", description="This is used to get user by id", response_model=SuccessResponse, status_code=status.HTTP_200_OK)
+def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    """
+    This is used to get user by id.  
+    """
+    try:
+        # Fetch the user from the database
+        user_data = db.query(user.User).filter(user.User.id == user_id).first()
+        if not user_data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # Return a success response with user info
+        return SuccessResponse(
+            message="User fetched successfully",
+            data=user_data.info()
+        )
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
+# UPDATING USER BY ID
+@router.put("/user/{user_id}", description="This is used to update user by id", response_model=SuccessResponse, status_code=status.HTTP_200_OK)
+def update_user(user_id: int, form_data: Admin_edit_user, db: Session = Depends(get_db)):
+    """
+    This is used to update user by id.  
+    """
+    try:
+        # Fetch the user from the database
+        user_data = db.query(user.User).filter(user.User.id == user_id).first()
+        if not user_data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # Update the user data
+        user_data.first_name = form_data.first_name
+        user_data.last_name = form_data.last_name
+        user_data.mobile_number = form_data.mobile_number
+        user_data.email_address = form_data.email_address
+        user_data.user_type = form_data.user_type
+
+        # Commit the changes to the database
+        db.commit()
+
+        # Return a success response with updated user info
+        return SuccessResponse(
+            message="User updated successfully",
+            data=user_data.info()
         )
 
     except Exception as e:

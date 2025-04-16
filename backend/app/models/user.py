@@ -5,7 +5,7 @@ class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
-    user_type = Column(String, server_default=text('1'), nullable=False)
+    user_type = Column(String, server_default=text('free-user'), nullable=False)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     email_address = Column(String, nullable=False, unique=True)
@@ -24,4 +24,5 @@ class User(Base):
             "last_name": self.last_name,
             "email_address": self.email_address,
             "mobile_number": self.mobile_number,
+            "user_type": self.user_type,
         }

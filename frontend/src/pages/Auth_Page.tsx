@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Eye, EyeOff, ShoppingBag, Mail, Phone, User, CheckCircle, X } from 'lucide-react';
 import { useFormik } from "formik";
 import { useNavigate } from 'react-router-dom';
@@ -46,7 +46,6 @@ export default function AuthPage() {
         }
         const response = await login_user(values);
         console.log(response.data.data);
-        
         loginUser(response.data.data);
         if (response.status === 200) {
           // On success:
@@ -56,8 +55,8 @@ export default function AuthPage() {
       } catch (error) {
         console.error("Error during login:", error);
         // Handle backend error messages
-        if (error.response && error.response.data && error.response.data.detail) {
-          setSubmitError(error.response.data.detail); // Set backend message
+        if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
         } else {
           setSubmitError("An unexpected error occurred. Please try again.");
         }
@@ -86,8 +85,13 @@ export default function AuthPage() {
 
         // Notification will automatically close and switch to login after timeout
       } catch (error) {
-        console.error("Error during signup:", error);
-        setSubmitError("Registration failed. Please try again.");
+        console.error("Error during login:", error);
+        // Handle backend error messages
+        if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+        } else {
+          setSubmitError("An unexpected error occurred. Please try again.");
+        }
       } finally {
         setSubmitting(false);
       }
@@ -156,6 +160,9 @@ export default function AuthPage() {
       signupFormik.handleSubmit();
     }, 0);
   };
+
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br flex flex-col items-center justify-center p-6 relative">

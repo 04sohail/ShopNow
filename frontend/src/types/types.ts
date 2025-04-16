@@ -84,8 +84,15 @@ export interface AdminUsers {
 export interface AdminUserRegistration {
     first_name: string;
     last_name: string;
-    mobile_number:number;
+    mobile_number:string;
     email_address: string;
     password: string;
+    user_type:string;
+}
+export interface AdminUserUpdate {
+    first_name: string;
+    last_name: string;
+    mobile_number:string;
+    email_address: string;
     user_type:string;
 }

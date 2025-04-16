@@ -42,7 +42,7 @@ export default function Cart_section() {
                         <ShoppingBag className="mx-auto mb-4 text-gray-400" size={64} />
                         <p className="text-xl text-gray-500">Your cart is empty</p>
                         <Link to={"/"}>
-                            <button className="mt-4 bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700">
+                            <button className="mt-4 bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 cursor-pointer transition">
                                 Start Shopping
                             </button>
                         </Link>
