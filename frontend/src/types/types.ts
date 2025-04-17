@@ -97,3 +97,8 @@ export interface AdminUserUpdate {
     email_address: string;
     user_type:string;
 }
+
+export interface UserRegistrationOtp{
+    email_address: string;
+    otp: number;
+}

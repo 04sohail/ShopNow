@@ -96,6 +96,26 @@ export default function AdminDashboard() {
         fetchData();
     }, []);
 
+    const refreshUsers = async () => {
+        try {
+
+            const userResponse = await get_all_users();
+            setUsers(userResponse);
+            console.log("Users refreshed:", userResponse);
+
+            const userCountResponse = await get_all_users_count();
+            setTotalUser(userCountResponse);
+
+            const activeUserResponse = await get_all_active_users();
+            setActiveUser(activeUserResponse);
+
+            const inactiveUserResponse = await get_all_in_active_users();
+            setInactiveUser(inactiveUserResponse);
+            console.log("Refreshing users...");
+        } catch (error) {
+            console.error("Error refreshing users:", error);
+        }
+    };
     const stats = {
         totalUsers: totalUser,
         activeUsers: activeUser,
@@ -288,12 +308,13 @@ export default function AdminDashboard() {
     };
 
     // Handle user deletion
-    const handleDeleteUser = () => {
+    const handleDeleteUser = async () => {
         if (userToDelete !== null) {
-            delete_user_by_id(userToDelete);
+            await delete_user_by_id(userToDelete);
             setUsers(users.filter(user => user.id !== userToDelete));
             setIsDeleteModalOpen(false);
             setUserToDelete(null);
+            await refreshUsers();
         }
     };
     const handleDeleteClick = (id: number) => {
@@ -364,7 +385,7 @@ export default function AdminDashboard() {
                 setSubmitError(null);
                 // API CALL
                 await add_new_user(values);
-
+                await refreshUsers();
                 // Show success notification at the top
                 setShowSuccessNotification(true);
                 resetForm();
@@ -440,12 +461,11 @@ export default function AdminDashboard() {
             try {
                 setSubmitError(null);
                 // API CALL
-                update_user_by_id(userToUpdate!, values);
-                // Show success notification at the top
+                await update_user_by_id(userToUpdate!, values);
                 setIsUpdateModalOpen(false);
                 setShowUpdateNotification(true);
                 resetForm();
-                // Notification will automatically close and switch to login after timeout
+                await refreshUsers();
             } catch (error) {
                 console.error("Error during login:", error);
                 // Handle backend error messages

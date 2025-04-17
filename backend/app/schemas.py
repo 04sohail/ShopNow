@@ -86,7 +86,6 @@ class User_login(BaseModel):
     email_address:EmailStr
     password:StrictStr
 
-
     # EMAIL VALIDATION
     @field_validator("email_address")
     def validate_email(cls, value):

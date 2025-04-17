@@ -71,3 +71,11 @@ export const adminUpdateUserSchema = Yup.object({
         .required("Phone Number is required")
         .matches(/^[6-9]\d{9}$/, "Phone Number must start with 6, 7, 8, or 9 and be exactly 10 digits"),
 });
+
+
+// OTP Validation Schema
+export const otpSchema = Yup.object({
+    otp: Yup.string()
+        .required('OTP is required')
+        .matches(/^[0-9]{4}$/, 'OTP must be 4 digits')
+});

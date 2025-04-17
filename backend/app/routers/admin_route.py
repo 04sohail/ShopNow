@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from ..schemas import SuccessResponse
 from ..models import user, inventory
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from ..database.connection import get_db
 from ..schemas import Admin_User_Registration, Admin_edit_user
 from passlib.context import CryptContext
@@ -137,7 +138,6 @@ def get_inactive_products(db: Session = Depends(get_db)):
         inactive_products = db.query(inventory.Inventory).filter(inventory.Inventory.status == '0').all()
         if not inactive_products:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No inactive products found")
-
         # Return a success response with user info
         return SuccessResponse(
             message="Inactive products fetched successfully",
@@ -156,12 +156,9 @@ def get_all_users(db: Session = Depends(get_db)):
     """
     try:
         # Fetch all users from the database
-        users = db.query(user.User).all()
-
+        users = db.query(user.User).order_by(desc(user.User.id)).all()
         if not users:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No users found")
-
-
         # Return a success response with user info
         return SuccessResponse(
             message="Users fetched successfully",

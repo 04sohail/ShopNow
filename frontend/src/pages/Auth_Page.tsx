@@ -1,12 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Eye, EyeOff, ShoppingBag, Mail, Phone, User, CheckCircle, X } from 'lucide-react';
+import { Eye, EyeOff, ShoppingBag, Mail, Phone, User, CheckCircle, X, ArrowLeft } from 'lucide-react';
 import { useFormik } from "formik";
 import { useNavigate } from 'react-router-dom';
 import { signupSchema, login_schema } from '../utils/validations';
-import { register_user } from '../services/user/registration_controller';
+import { register_user, verify_otp } from '../services/user/registration_controller';
 import { login_user } from '../services/user/login_controller';
-import { useUser } from '../contexts/user/useUser';
-
 
 const loginInitialValues = {
   email_address: "",
@@ -24,12 +22,23 @@ const signupInitialValues = {
 };
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  // Auth mode states
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'verify'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [showOTPSuccessNotification, setShowOTPSuccessNotification] = useState(false);
+
+  // OTP related states
+  const [otp, setOtp] = useState(['', '', '', '']);
+  const [verifying, setVerifying] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState('');
+
   const navigate = useNavigate();
   const errorRef = useRef(null);
+  const inputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+
   // Login form handling
   const loginFormik = useFormik({
     initialValues: loginInitialValues,
@@ -55,7 +64,7 @@ export default function AuthPage() {
         console.error("Error during login:", error);
         // Handle backend error messages
         if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
-          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
         } else {
           setSubmitError("An unexpected error occurred. Please try again.");
         }
@@ -64,7 +73,6 @@ export default function AuthPage() {
       }
     }
   });
-
 
   // Signup form handling
   const signupFormik = useFormik({
@@ -78,16 +86,28 @@ export default function AuthPage() {
         // API CALL
         await register_user(values);
 
+        // Store the email for verification reference
+        setUserEmail(values.email_address);
+
         // Show success notification at the top
         setShowSuccessNotification(true);
-        resetForm();
 
-        // Notification will automatically close and switch to login after timeout
+        // Switch to verification mode
+        setTimeout(() => {
+          setShowSuccessNotification(false);
+          setAuthMode('verify');
+          // Focus on the first OTP input field
+          if (inputRefs[0].current) {
+            inputRefs[0].current.focus();
+          }
+        }, 2000);
+
+        resetForm();
       } catch (error) {
-        console.error("Error during login:", error);
+        console.error("Error during signup:", error);
         // Handle backend error messages
         if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
-          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+          setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
         } else {
           setSubmitError("An unexpected error occurred. Please try again.");
         }
@@ -97,27 +117,102 @@ export default function AuthPage() {
     }
   });
 
-  // Effect to handle notification auto-close and switching to login
-  useEffect(() => {
-    let timer;
-    if (showSuccessNotification) {
-      // First timer: wait a bit to make sure the notification is visible
-      timer = setTimeout(() => {
-        // Second timer: auto close the notification and switch to login
-        const switchTimer = setTimeout(() => {
-          setShowSuccessNotification(false);
-          setIsLogin(true); // Switch to login view
-        }, 2000); // 2 seconds display time for notification
+  // Handle OTP input change
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return; 
 
-        return () => clearTimeout(switchTimer);
-      }, 200); // Small delay to ensure animation runs properly
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus to next input
+    if (value && index < 3 && inputRefs[index + 1].current) {
+      inputRefs[index + 1].current?.focus();
     }
-    return () => clearTimeout(timer);
+  };
+
+  // Handle key press in OTP fields
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace') {
+      if (!otp[index] && index > 0 && inputRefs[index - 1].current) {
+        inputRefs[index - 1].current?.focus();
+      }
+    }
+  };
+
+  // Handle OTP verification
+  const verifyOtp = async () => {
+    const otpValue = otp.join('');
+    if (otpValue.length !== 4) {
+      setOtpError('Please enter all 4 digits of the OTP');
+      return;
+    }
+    setVerifying(true);
+    setOtpError(null);
+    const userDetail = {
+      email_address: userEmail,
+      otp: Number.parseInt(otpValue)
+    }
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // For demo purposes, let's assume any OTP is valid
+      const response = await verify_otp(userDetail);
+      if (response) {
+        setSubmitError(null);
+        setOtp(['', '', '', '']);
+        setShowOTPSuccessNotification(true);
+        setTimeout(() => {
+          setShowOTPSuccessNotification(false);
+          setAuthMode('login');
+          return
+        }
+          , 2000);
+      }
+      else {
+        setOtpError('Invalid OTP. Please try again.');
+      }
+      return;
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      setOtpError('Invalid OTP. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    try {
+      // Mock resend OTP - replace with actual API call
+      // await resendOtpApi(userEmail);
+      // Show notification
+      setShowSuccessNotification(true);
+      setTimeout(() => {
+        setShowSuccessNotification(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Error resending OTP:", error);
+      setOtpError('Failed to resend OTP. Please try again.');
+    }
+  };
+
+  // Effect to handle notification auto-close
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (showSuccessNotification) {
+      timer = setTimeout(() => {
+        setShowSuccessNotification(false);
+      }, 2000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [showSuccessNotification]);
 
-  const toggleAuthMode = () => {
-    setIsLogin(!isLogin);
+  const toggleAuthMode = (mode: 'login' | 'signup') => {
+    setAuthMode(mode);
     setSubmitError(null);
+    setOtpError(null);
   };
 
   const togglePasswordVisibility = () => {
@@ -126,7 +221,6 @@ export default function AuthPage() {
 
   const handleCloseNotification = () => {
     setShowSuccessNotification(false);
-    setIsLogin(true);
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -160,19 +254,34 @@ export default function AuthPage() {
     }, 0);
   };
 
-
-
-
   return (
     <div className="min-h-screen bg-gradient-to-br flex flex-col items-center justify-center p-6 relative">
-      {/* Success Notification at the top */}
+      {/* Success OTP Sent at the top */}
       {showSuccessNotification && (
         <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md z-50 transform transition-all duration-300 ease-in-out">
           <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
             <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
             <div className="flex-grow">
-              <p className="font-medium text-green-800">Registration Successful!</p>
-              <p className="text-green-700 text-sm">Your account has been created. Redirecting to login...</p>
+              <p className="font-medium text-green-800">OTP Sent Successfully !</p>
+              <p className="text-green-700 text-sm">Please Verify OTP.</p>
+            </div>
+            <button
+              onClick={handleCloseNotification}
+              className="text-green-500 hover:text-green-700 ml-2 focus:outline-none"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Success OTP Verified Successfully at the top */}
+      {showOTPSuccessNotification && (
+        <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md z-50 transform transition-all duration-300 ease-in-out">
+          <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+            <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+            <div className="flex-grow">
+              <p className="font-medium text-green-800">OTP Verified Successfully !</p>
+              <p className="text-green-700 text-sm">Redirecting To Login Page ...</p>
             </div>
             <button
               onClick={handleCloseNotification}
@@ -192,32 +301,52 @@ export default function AuthPage() {
               <ShoppingBag className="h-8 w-8" />
               <h1 className="text-2xl font-bold">ShopNow</h1>
             </div>
-            <h2 className="text-3xl font-bold mb-4">{isLogin ? 'Welcome Back!' : 'Join Our Community'}</h2>
+            <h2 className="text-3xl font-bold mb-4">
+              {authMode === 'login' ? 'Welcome Back!' :
+                authMode === 'signup' ? 'Join Our Community' :
+                  'Verify Your Account'}
+            </h2>
             <p className="mb-4 text-indigo-100">
-              {isLogin
+              {authMode === 'login'
                 ? 'Sign in to access your account, view your orders, and continue shopping.'
-                : 'Create an account to enjoy a personalized shopping experience, track orders, and more.'}
+                : authMode === 'signup'
+                  ? 'Create an account to enjoy a personalized shopping experience, track orders, and more.'
+                  : 'Please enter the 4-digit verification code sent to your email or phone.'}
             </p>
           </div>
           <div className="mt-auto">
-            <p className="text-indigo-200 text-sm">
-              {isLogin
-                ? "Don't have an account?"
-                : "Already have an account?"}
-              <button
-                onClick={toggleAuthMode}
-                className="text-white font-semibold ml-1 underline focus:outline-none cursor-pointer"
-              >
-                {isLogin ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
+            {authMode !== 'verify' && (
+              <p className="text-indigo-200 text-sm">
+                {authMode === 'login'
+                  ? "Don't have an account?"
+                  : "Already have an account?"}
+                <button
+                  onClick={() => toggleAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                  className="text-white font-semibold ml-1 underline focus:outline-none cursor-pointer"
+                >
+                  {authMode === 'login' ? 'Sign up' : 'Sign in'}
+                </button>
+              </p>
+            )}
+            {authMode === 'verify' && (
+              <p className="text-indigo-200 text-sm">
+                <button
+                  onClick={() => toggleAuthMode('signup')}
+                  className="text-white font-semibold flex items-center focus:outline-none cursor-pointer"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Back to signup
+                </button>
+              </p>
+            )}
           </div>
         </div>
 
         {/* Right Side - Form */}
         <div className="p-8 md:p-12 md:w-3/5">
           <h2 className="text-2xl font-bold text-gray-800 mb-8">
-            {isLogin ? 'Sign In' : 'Create Account'}
+            {authMode === 'login' ? 'Sign In' :
+              authMode === 'signup' ? 'Create Account' :
+                'Verify OTP'}
           </h2>
 
           {/* Error message display */}
@@ -227,7 +356,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          {isLogin ? (
+          {authMode === 'login' && (
             /* Login Form */
             <form className="space-y-6" onSubmit={handleLoginSubmit}>
               <div>
@@ -325,7 +454,9 @@ export default function AuthPage() {
                 </button>
               </div>
             </form>
-          ) : (
+          )}
+
+          {authMode === 'signup' && (
             /* Signup Form */
             <form className="space-y-6" onSubmit={handleSignupSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -492,6 +623,58 @@ export default function AuthPage() {
                 </button>
               </div>
             </form>
+          )}
+
+          {authMode === 'verify' && (
+            /* OTP Verification Form */
+            <div className="space-y-6">
+              {otpError && (
+                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {otpError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  Enter the 4-digit verification code sent to your phone
+                </label>
+                <div className="flex justify-center gap-3">
+                  {[0, 1, 2, 3].map((index) => (
+                    <input
+                      key={index}
+                      ref={inputRefs[index]}
+                      type="text"
+                      maxLength={1}
+                      value={otp[index]}
+                      onChange={(e) => handleOtpChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(index, e)}
+                      className="w-14 h-14 text-center text-2xl font-bold border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={resendOtp}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium focus:outline-none"
+                >
+                  Resend OTP
+                </button>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={verifyOtp}
+                  disabled={verifying}
+                  className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition duration-150 ease-in-out cursor-pointer disabled:opacity-70"
+                >
+                  {verifying ? "Verifying..." : "Verify OTP"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
