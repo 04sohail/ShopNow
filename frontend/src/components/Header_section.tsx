@@ -1,20 +1,17 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ShoppingCart, User, LogOut, ChevronDown, ShoppingBag } from 'lucide-react';
-import { useUser } from '../contexts/user/useUser';
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from 'react-redux';
 import { CartItem } from '../types/types';
 
-
 const Header = () => {
   const reduxData = useSelector((state: { carts: CartItem[] }) => state.carts).slice(1);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { user, logoutUser } = useUser();
-  console.log(user);
 
   const handleLogout = () => {
-    logoutUser();
+    sessionStorage.removeItem("logged_in_user");
     navigate("/login");
   };
 
@@ -22,6 +19,28 @@ const Header = () => {
     e.preventDefault();
     navigate('/cart');
   };
+
+  const user = JSON.parse(sessionStorage.getItem("logged_in_user") || "{}");
+
+  // Close the profile dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    if (isProfileDropdownOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isProfileDropdownOpen]);
 
   return (
     <header className="fixed top-0 left-0 w-full shadow-md z-50 bg-indigo-600 text-white">
@@ -43,7 +62,7 @@ const Header = () => {
             </span>
           </div>
           {/* Profile Section */}
-          <div className="relative">
+          <div className="relative" ref={profileDropdownRef}>
             {!user.email_address ? (
               <Link to="/login" className="flex items-center cursor-pointer">
                 <User size={24} />
@@ -53,12 +72,11 @@ const Header = () => {
               <div onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
                 <div className="flex items-center cursor-pointer">
                   <User size={24} />
-                  <ChevronDown className="ml-1 text-gray-500" size={16} />
+                  <ChevronDown className="ml-1" size={16} />
                 </div>
                 {isProfileDropdownOpen && (
                   <div
                     className="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg p-4"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <div className="mb-4">
                       <h2 className="text-sm font-semibold text-gray-800">
@@ -76,8 +94,6 @@ const Header = () => {
                       Logout
                     </button>
                   </div>
-
-
                 )}
               </div>
             )}

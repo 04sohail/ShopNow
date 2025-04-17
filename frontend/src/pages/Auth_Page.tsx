@@ -30,7 +30,6 @@ export default function AuthPage() {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const navigate = useNavigate();
   const errorRef = useRef(null);
-  const { loginUser } = useUser();
   // Login form handling
   const loginFormik = useFormik({
     initialValues: loginInitialValues,
@@ -40,18 +39,18 @@ export default function AuthPage() {
     onSubmit: async (values, { setSubmitting, resetForm }) => {
       try {
         setSubmitError(null);
-        if (values.email_address === "admin@gmail.com" && values.password === "@Admin123") {
-          navigate('/admin');
-          return;
-        }
         const response = await login_user(values);
-        console.log(response.data.data);
-        loginUser(response.data.data);
-        if (response.status === 200) {
-          // On success:
-          navigate('/');
-          resetForm();
+        sessionStorage.setItem("logged_in_user", JSON.stringify(response.data.data));
+        if (response.data.data.user_type === "free_user") {
+          navigate("/");
         }
+        else if (response.data.data.user_type === "admin") {
+          navigate("/admin");
+        }
+        else {
+          console.log("Invalid user");
+        }
+        resetForm();
       } catch (error) {
         console.error("Error during login:", error);
         // Handle backend error messages

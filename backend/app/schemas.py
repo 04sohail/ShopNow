@@ -55,7 +55,7 @@ class User_Registration(BaseModel):
     # EMAIL VALIDATION
     @field_validator("email_address")
     def validate_email(cls, value):
-        allowed_domains = ["example.com", "test.com", "gmail.com", 'talent.com', "gmail.in"]
+        allowed_domains = ["example.com", "test.com", "gmail.com", 'talent.com', "gmail.in", "talentelgia.com"]
         domain = value.split("@")[1]
         if domain not in allowed_domains:
             raise ValueError(f"Email must be from one of the following domains: {', '.join(allowed_domains)}")
@@ -90,7 +90,7 @@ class User_login(BaseModel):
     # EMAIL VALIDATION
     @field_validator("email_address")
     def validate_email(cls, value):
-        allowed_domains = ["example.com", "test.com", "gmail.com", 'talent.com']
+        allowed_domains = ["example.com", "test.com", "gmail.com", 'talent.com', "talentelgia.com"]
         domain = value.split("@")[1]
         if domain not in allowed_domains:
             raise ValueError(f"Email must be from one of the following domains: {', '.join(allowed_domains)}")
@@ -281,3 +281,12 @@ class SuccessResponse(BaseModel):
 
 class ValidationErrorSchema(BaseModel):
     detail: str
+
+
+class OtpSchema(BaseModel):
+    email_address: EmailStr
+    otp: int
+
+    class Config:
+        from_attributes = True
+        validate_by_name = True

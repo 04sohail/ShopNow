@@ -16,14 +16,16 @@ import {
     Eye,
     EyeOff,
     Mail,
-    CheckCircle
+    CheckCircle,
+    ChevronDown,
+    LogOut
 } from 'lucide-react';
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id, add_new_user, get_user_by_id, update_user_by_id } from '../services/admin/user_controller';
 import { get_all_products_count, get_all_active_products, get_all_in_active_products } from '../services/admin/products_controller';
 import { AdminUsers } from '../types/types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import { adminUpdateUserSchema, signupSchema } from '../utils/validations';
 
@@ -50,7 +52,18 @@ export default function AdminDashboard() {
     const [showPassword, setShowPassword] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [userToUpdate, setUserToUpdate] = useState<number | null>(null);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+    const profileDropdownRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
 
+    // USER DATA
+    const user = JSON.parse(sessionStorage.getItem("logged_in_user") || "{}");
+    // LOGOUT
+    const handleLogout = () => {
+        sessionStorage.removeItem("logged_in_user");
+        setIsProfileDropdownOpen(false);
+        navigate("/login");
+    };
     // Fetch all required data when the component mounts
     useEffect(() => {
         const fetchData = async () => {
@@ -239,7 +252,6 @@ export default function AdminDashboard() {
     ]);
 
     // Pagination state
-
     const itemsPerPage = 10;
 
     // Calculate pagination
@@ -276,7 +288,6 @@ export default function AdminDashboard() {
     };
 
     // Handle user deletion
-
     const handleDeleteUser = () => {
         if (userToDelete !== null) {
             delete_user_by_id(userToDelete);
@@ -481,6 +492,27 @@ export default function AdminDashboard() {
             updateFormik.handleSubmit();
         }, 0);
     };
+
+    const handleOutsideClick = (event: MouseEvent) => {
+        if (
+            profileDropdownRef.current &&
+            !profileDropdownRef.current.contains(event.target as Node)
+        ) {
+            setIsProfileDropdownOpen(false); // Close the modal
+        }
+    };
+
+    useEffect(() => {
+        if (isProfileDropdownOpen) {
+            document.addEventListener('mousedown', handleOutsideClick);
+        } else {
+            document.removeEventListener('mousedown', handleOutsideClick);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+        };
+    }, [isProfileDropdownOpen]);
 
     return (
         <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
@@ -928,16 +960,37 @@ export default function AdminDashboard() {
                         <h2 className="text-xl font-semibold text-gray-800">
                             {navItems.find(item => item.id === activePage)?.name || "Dashboard"}
                         </h2>
-
                         <div className="flex items-center gap-4">
-
                             {/* Profile */}
-                            <button className="flex items-center gap-2 text-gray-700 hover:text-indigo-600">
-                                <div className="h-8 w-8 bg-indigo-600 text-white rounded-full flex items-center justify-center">
-                                    <User size={16} />
+                            <div onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}>
+                                <div className="flex items-center cursor-pointer">
+                                    <User size={24} />
+                                    <ChevronDown className="ml-1" size={16} />
                                 </div>
-                                <span className="font-medium hidden sm:inline">Admin</span>
-                            </button>
+                                {isProfileDropdownOpen && (
+                                    <div
+                                        ref={profileDropdownRef}
+                                        className="absolute right-0 mt-2 w-64 bg-white border rounded-lg shadow-lg p-4"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="mb-4">
+                                            <h2 className="text-sm font-semibold text-gray-800">
+                                                {user.first_name.charAt(0).toUpperCase() + user.first_name.slice(1)}{" "}
+                                                {user.last_name.charAt(0).toUpperCase() + user.last_name.slice(1)}
+                                            </h2>
+                                            <p className="text-sm text-gray-500">{user.email_address}</p>
+                                        </div>
+                                        <hr className="my-2" />
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full flex items-center text-left text-sm cursor-pointer text-red-500 hover:bg-gray-100 p-2 rounded"
+                                        >
+                                            <LogOut size={16} className="mr-2" />
+                                            Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>

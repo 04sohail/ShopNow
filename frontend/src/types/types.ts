@@ -7,15 +7,16 @@ export interface User_Registration {
     agreeTerms: boolean;
 }
 export interface User_Login {
-    email_address: string
-    password: string
+    email_address: string;
+    password: string;
 }
+
 
 export interface User_Login_Context {
     first_name: string;
     last_name: string;
-    email_address: string
-    rememberMe: boolean
+    email_address: string;
+    user_type: string;
 }
 
 export interface Product {

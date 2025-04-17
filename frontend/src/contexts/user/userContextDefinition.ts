@@ -1,9 +1,6 @@
 import { createContext } from "react";
 import { User_Login_Context } from "../../types/types";
 
-
-
-
 // Create UserContext
 interface UserContextType {
     user: User_Login_Context;

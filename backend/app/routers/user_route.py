@@ -1,9 +1,15 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from passlib.context import CryptContext
-from ..schemas import User_Registration, SuccessResponse, User_login, MessageResponse
+from ..schemas import User_Registration, SuccessResponse, User_login, OtpSchema
 from ..models import user
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
+from ..services.otp_service import generate_otp
+from ..services.email_service import send_otp_email
+from datetime import datetime, timezone, timedelta
+from ..config.environment_variables import SMTP_SERVER, SMTP_PORT_TLS, SMTP_PORT_SSL, EMAIL, PASSWORD
+
+
 
 router = APIRouter(prefix="/users")
 
@@ -36,17 +42,29 @@ def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
             email_address=form_data.email_address.strip(),
             password=hashed_password,
         )
-
+        
+        generated_otp, otp_expires_at = generate_otp()
+        new_user.otp = generated_otp
+        new_user.otp_expires_at = otp_expires_at
+        db.commit()
+        db.refresh(form_data)
+        # Send OTP to email
+        print("Sending OTP to email...", form_data.email_address, generated_otp)
+        send_otp_email(form_data.email_address, generated_otp)        
+        
+        
         # Add the user to the session and commit
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
 
         # Return a success response with user info
-        return SuccessResponse(
-            message="Registration Successful",
-            data=new_user.info()
-        )
+        return SuccessResponse(message="OTP Sent Successfully To {}".format(form_data.email_address))
+
+        # return SuccessResponse(
+        #     message="Registration Successful",
+        #     data=new_user.info()
+        # )
 
     except HTTPException as http_exc:
         # Reraise HTTP exceptions directly
@@ -59,6 +77,7 @@ def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="An unexpected error occurred during registration. Please try again later."
         )
+
 
 
 # LOGIN USER
@@ -93,7 +112,8 @@ def login_user(user_data: User_login, db: Session = Depends(get_db)):
         data_dict = {
             "first_name": data.first_name,
             "last_name": data.last_name,
-            "email_address": data.email_address
+            "email_address": data.email_address,
+            "user_type": data.user_type,
         }
         return SuccessResponse(message="Logged In Successfully", data=data_dict)
     
@@ -109,3 +129,34 @@ def login_user(user_data: User_login, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again later."
         )
+
+@router.post("/verify-otp/", description="Verify OTP", summary="Verify OTP")
+def verify_otp(otp_data: OtpSchema, db: Session = Depends(get_db)):
+    """
+    Verify OTP sent to the user's email.
+    """
+    email = otp_data.email_address
+    otp_input = otp_data.otp
+    query = db.query(user.User).filter(user.User.email_address == email)
+    data = query.first()
+    print(type(otp_input), type(data.otp))
+    if not data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if data.otp != otp_input:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP")
+    print(type(data.otp_expires_at ))
+    print(type(datetime.now(timezone.utc)+ timedelta(seconds=0)))
+    if data.otp_expires_at < datetime.now():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OTP expired")
+    data.otp = None
+    data.otp_expires_at = None
+    db.commit()
+    db.refresh(data)
+    # Prepare the response data
+    data_dict = {
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "email_address": data.email_address,
+        "user_type": data.user_type,
+    }
+    return SuccessResponse(message="OTP Verified Successfully", data=data_dict)        

@@ -1,4 +1,3 @@
-import { useUser } from '../contexts/user/useUser';
 import { Navigate } from 'react-router-dom';
 
 interface PublicRouteProps {
@@ -6,13 +5,11 @@ interface PublicRouteProps {
 }
 
 export const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
-    const { user } = useUser();
-
-    // If user is logged in, redirect to the dashboard
+    const user = JSON.parse(sessionStorage.getItem("logged_in_user") || "{}");
     if (user?.email_address && user.email_address.length > 0) {
-        return <Navigate to="/" replace />;
+        return user.user_type === 'admin'
+            ? <Navigate to="/admin" replace />
+            : <Navigate to="/" replace />;
     }
-
-    // Otherwise, render the children (public content)
     return <>{children}</>;
 };

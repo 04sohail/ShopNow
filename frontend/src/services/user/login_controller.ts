@@ -5,6 +5,7 @@ import { User_Login } from "../../types/types";
 export const login_user = async (userData: User_Login) => {
     try {
         const response = await api.post("/users/login/", userData);
+        console.log(response.data);
         return response;
     } catch (error) {
         console.error("Error registering user:", error);
