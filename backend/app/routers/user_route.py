@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from passlib.context import CryptContext
-from ..schemas import User_Registration, SuccessResponse, User_login, OtpSchema
+from ..schemas import User_Registration, SuccessResponse, User_login, OtpSchema, GetUserByEmailAddress, ResetPassword
 from ..models import user
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
@@ -38,7 +38,6 @@ def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
             email_address=form_data.email_address.strip(),
             password=hashed_password,
         )
-        
         generated_otp, otp_expires_at = generate_otp()
         new_user.otp = generated_otp
         new_user.otp_expires_at = otp_expires_at
@@ -147,3 +146,72 @@ def verify_otp(otp_data: OtpSchema, db: Session = Depends(get_db)):
         "user_type": data.user_type,
     }
     return SuccessResponse(message="OTP Verified Successfully", data=data_dict)        
+
+
+# GETTING USER BY EMAIL 
+@router.post("/get-user-by-email", description="Get user by email address", summary="Get user by email address")
+async def get_user_by_email (form_data:GetUserByEmailAddress, db:Session=Depends(get_db)):
+    """
+    Function To Get User By Email
+    """
+    try:
+        data = db.query(user.User).filter(user.User.email_address == form_data.email_address).first()
+        if not data:
+            raise HTTPException(status_code=status.HTTP_200_OK, detail="User not Found")
+        generated_otp, otp_expires_at = generate_otp()
+        data.otp = generated_otp
+        data.otp_expires_at = otp_expires_at
+        # Send OTP to email
+        print("Sending OTP to email...", form_data.email_address, generated_otp)
+        send_otp_email(form_data.email_address, generated_otp)  
+        db.commit()
+        db.refresh(data)
+        print(data.otp, "OTP SENT SUCCESSFULLY")
+        return SuccessResponse(message="User Found", data=data.info())
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{str(e).split(":")[1].strip()}")
+
+# FORGOT PASSWORD
+@router.post('/forgot-password', description="forgot Password", summary="forgot Password")
+async def forgot_password(form_data: GetUserByEmailAddress, db: Session = Depends(get_db)):
+    """
+    Function To Reset Password
+    """
+    try:
+        data = db.query(user.User).filter(user.User.email_address == form_data.email_address).first()
+        if not data:
+            raise HTTPException(status_code=status.HTTP_200_OK, detail="User not Found")
+        generated_otp, otp_expires_at = generate_otp()
+        data.otp = generated_otp
+        data.otp_expires_at = otp_expires_at
+        # Send OTP to email
+        print("Sending OTP to email...", form_data.email_address, generated_otp)
+        send_otp_email(form_data.email_address, generated_otp)  
+        db.commit()
+        db.refresh(data)
+        print(data.otp, "OTP SENT SUCCESSFULLY")
+        return SuccessResponse(message="User Found", data=data.info())
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{str(e).split(':')[1].strip()}")
+    
+# RESET PASSWORD
+@router.post('/reset-password', description="Reset Password", summary="Reset Password")
+async def reset_password(reset_form_data: ResetPassword, db: Session = Depends(get_db)):
+    """
+    Function To Reset Password
+    """
+    try:
+        data = db.query(user.User).filter(user.User.email_address == reset_form_data.email_address).first()
+        if not data:
+            raise HTTPException(status_code=status.HTTP_200_OK, detail="User not Found")
+        hashed_password = pwd_context.hash(reset_form_data.new_password)
+        data.password = hashed_password
+        data.updated_at = datetime.now() 
+        db.commit()
+        db.refresh(data)
+        return SuccessResponse(message="Password Reset Successfully", data=data.info())
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{str(e).split(':')[1].strip()}")

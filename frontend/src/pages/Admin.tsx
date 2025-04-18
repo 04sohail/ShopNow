@@ -468,7 +468,7 @@ export default function AdminDashboard() {
                 console.error("Error during login:", error);
                 // Handle backend error messages
                 if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
-                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); 
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
                 } else {
                     setSubmitError("An unexpected error occurred. Please try again.");
                 }

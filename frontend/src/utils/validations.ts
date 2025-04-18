@@ -79,3 +79,34 @@ export const otpSchema = Yup.object({
         .required('OTP is required')
         .matches(/^[0-9]{4}$/, 'OTP must be 4 digits')
 });
+
+export const forgetPasswordSchema = Yup.object({
+    email_address: Yup.string()
+        .required("Email is required")
+        .email("Invalid email")
+        .matches(
+            /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+            "Email must be a valid format"
+        ),
+});
+
+
+export const resetPasswordSchema = Yup.object({
+    new_password: Yup.string()
+        .required("Password is required")
+        .min(8, "Password must be at least 8 characters")
+        .matches(/[A-Z]/, "Must have one uppercase letter")
+        .matches(/[a-z]/, "Must have one lowercase letter")
+        .matches(/[0-9]/, "Must have one number")
+        .matches(/[!@#$%^&*()\-_=+[\]{};:',.<>/?\\|]/, "Must have one special character")
+        .matches(/^[^\s]*$/, "No spaces allowed"),
+    confirm_password: Yup.string()
+        .required("Password is required")
+        .oneOf([Yup.ref("new_password")], "Passwords must match")
+        .min(8, "Password must be at least 8 characters")
+        .matches(/[A-Z]/, "Must have one uppercase letter")
+        .matches(/[a-z]/, "Must have one lowercase letter")
+        .matches(/[0-9]/, "Must have one number")
+        .matches(/[!@#$%^&*()\-_=+[\]{};:',.<>/?\\|]/, "Must have one special character")
+        .matches(/^[^\s]*$/, "No spaces allowed"),
+});

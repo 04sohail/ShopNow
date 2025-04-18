@@ -17,11 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # Connecting To Database
 get_psycopg2_connection()
 
 # User Route
 app.include_router(user_route.router, tags=["User"])
 app.include_router(admin_route.router, tags=["Admin"])
-

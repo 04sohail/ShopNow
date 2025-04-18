@@ -11,7 +11,9 @@ export interface User_Login {
     password: string;
 }
 
-
+export interface Get_User_From_Email_Address {
+    email_address: string;
+}
 export interface User_Login_Context {
     first_name: string;
     last_name: string;
@@ -79,26 +81,31 @@ export interface AdminUsers {
     id: number;
     first_name: string;
     last_name: string;
-    mobile_number:number;
+    mobile_number: number;
     email_address: string;
 }
 export interface AdminUserRegistration {
     first_name: string;
     last_name: string;
-    mobile_number:string;
+    mobile_number: string;
     email_address: string;
     password: string;
-    user_type:string;
+    user_type: string;
 }
 export interface AdminUserUpdate {
     first_name: string;
     last_name: string;
-    mobile_number:string;
+    mobile_number: string;
     email_address: string;
-    user_type:string;
+    user_type: string;
 }
 
-export interface UserRegistrationOtp{
+export interface UserRegistrationOtp {
     email_address: string;
     otp: number;
+}
+export interface UserResetPassword {
+    email_address: string;
+    new_password: string;
+    confirm_password: string;
 }

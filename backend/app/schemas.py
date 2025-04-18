@@ -253,16 +253,73 @@ class Admin_edit_user(BaseModel):
         if domain not in allowed_domains:
             raise ValueError(f"Email must be from one of the following domains: {', '.join(allowed_domains)}")
         return value
-
-
     class Config:
         from_attributes = True
         validate_by_name = True
 
 
 
+class GetUserByEmailAddress(BaseModel):
+    email_address:str
+    class Config:
+        from_attributes = True
+        validate_by_name = True
+    # EMAIL VALIDATION
+    @field_validator('email_address')
+    def validate_email(cls, value):
+        allowed_domains = ['gmail.com', 'test.com', 'talentelgia.com']
+        domain = value.split("@")[1]
+        if domain not in allowed_domains:
+            raise ValueError(f"Email must be from one of the following domains: {', '.join(allowed_domains)}")
+        return value
 
 
+class ResetPassword(BaseModel):
+    email_address: EmailStr
+    new_password: StrictStr
+    confirm_password: StrictStr
+    @field_validator('email_address')
+    def validate_email(cls, value):
+        allowed_domains = ['gmail.com', 'test.com', 'talentelgia.com']
+        domain = value.split("@")[1]
+        if domain not in allowed_domains:
+            raise ValueError(f"Email must be from one of the following domains: {', '.join(allowed_domains)}")
+        return value
+    # PASSWORD VALIDATION
+    @field_validator("new_password")
+    def validate_password(cls, value):
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(char.isdigit() for char in value):
+            raise ValueError("Password must contain at least one digit")
+        if not any(char.isupper() for char in value):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(char.islower() for char in value):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(char in "!@#$%^&*()-_=+[]{};:'\",.<>?/\\|`~" for char in value):
+            raise ValueError("Password must contain at least one special character")
+        return value
+    # PASSWORD VALIDATION
+    @field_validator("confirm_password")
+    def validate_password(cls, value):
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(char.isdigit() for char in value):
+            raise ValueError("Password must contain at least one digit")
+        if not any(char.isupper() for char in value):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(char.islower() for char in value):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(char in "!@#$%^&*()-_=+[]{};:'\",.<>?/\\|`~" for char in value):
+            raise ValueError("Password must contain at least one special character")
+        return value
+    class Config:
+        from_attributes = True
+        validate_by_name = True
+
+    class Config:
+        from_attributes = True
+        validate_by_name = True
 
 
 class MessageResponse(BaseModel):
