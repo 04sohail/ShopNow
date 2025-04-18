@@ -414,8 +414,6 @@ export default function AdminDashboard() {
             mobile_number: true,
             user_type: true
         });
-
-        // Add a small delay to ensure touched state is updated
         setTimeout(() => {
             signupFormik.handleSubmit();
         }, 0);
@@ -470,7 +468,7 @@ export default function AdminDashboard() {
                 console.error("Error during login:", error);
                 // Handle backend error messages
                 if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
-                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); 
                 } else {
                     setSubmitError("An unexpected error occurred. Please try again.");
                 }
@@ -507,7 +505,6 @@ export default function AdminDashboard() {
             mobile_number: true,
             user_type: true
         });
-        // Add a small delay to ensure touched state is updated
         setTimeout(() => {
             updateFormik.handleSubmit();
         }, 0);

@@ -479,7 +479,6 @@ export default function AuthPage() {
                     <p className="mt-1 text-sm text-red-600">{signupFormik.errors.first_name}</p>
                   )}
                 </div>
-
                 <div>
                   <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                   <input

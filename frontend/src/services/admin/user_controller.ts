@@ -82,8 +82,7 @@ export const get_user_by_id = async (userId: number) => {
 // FUNCTION TO UPDATE USER BY ID
 export const update_user_by_id = async (userId: number, userData: AdminUserUpdate) => {
     try {
-        console.log("INSIDE UPDATE USER FUNCTION", userId, userData);
-        
+        console.log("INSIDE UPDATE USER FUNCTION", userId, userData);        
         const response = await api.put(`/admin/user/${userId}`, userData);
         return response.data;
     } catch (error) {
