@@ -311,7 +311,7 @@ def update_user(user_id: int, form_data: Admin_edit_user, db: Session = Depends(
         raise http_exc
     except Exception as e:
         db.rollback()
-        print("EXCEPTION", e)
+        print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
@@ -319,9 +319,7 @@ def update_user(user_id: int, form_data: Admin_edit_user, db: Session = Depends(
 
 @router.post("/products/create", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
-    print(product)
     try:
-        # Check if the product already exists by title
         existing_product = db.query(Product).filter(Product.title == product.title).first()
         if existing_product:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Product already exists")
@@ -346,7 +344,6 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 def read_products(db: Session = Depends(get_db)):
     try:
         products = db.query(Product).order_by(desc(Product.id)).all()
-        pprint.pprint(product.info() for product in products)
         return SuccessResponse(
             message="Products fetched successfully",
             data=[product.info() for product in products]

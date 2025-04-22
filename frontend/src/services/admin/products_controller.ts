@@ -35,7 +35,7 @@ export const get_all_in_active_products = async () => {
 export const get_all_products = async () => {
     try {
         const response = await api.get(`admin/products/all`);
-        return response.data.data;
+        return response;
     } catch (error) {
         console.error("Error fetching products:", error);
         throw error;
