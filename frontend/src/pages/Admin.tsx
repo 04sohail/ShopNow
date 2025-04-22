@@ -22,8 +22,8 @@ import {
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id, add_new_user, get_user_by_id, update_user_by_id } from '../services/admin/user_controller';
-import { get_all_products_count, get_all_active_products, get_all_in_active_products, get_all_products, delete_product_by_id, add_new_product } from '../services/admin/products_controller';
-import { AdminUsers, ProductDetails, ProductDetailsBody } from '../types/types';
+import { get_all_products_count, get_all_active_products, get_all_in_active_products, get_all_products, delete_product_by_id, add_new_product, get_product_by_id, update_product_by_id } from '../services/admin/products_controller';
+import { AdminUsers, ProductDetails, ProductDetailsBody, ProductUpdateBody } from '../types/types';
 import { useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import { adminUpdateUserSchema, signupSchema, productAddSchema } from '../utils/validations';
@@ -31,6 +31,8 @@ import { Bounce, toast, ToastContainer } from 'react-toastify';
 
 
 export default function AdminDashboard() {
+    // LOADING STATE
+    const [loading, setLoading] = useState(true);
     // DASHBOARD SECTION
     const [users, setUsers] = useState<AdminUsers[]>([]);
     const [totalUser, setTotalUser] = useState(0);
@@ -43,6 +45,7 @@ export default function AdminDashboard() {
 
     // SORTING AND SEARCHING SECTION
     const [originalUsers, setOriginalUsers] = useState<AdminUsers[]>([]);
+    const [originalProducts, setOriginalProducts] = useState<ProductDetails[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [sortOption, setSortOption] = useState("");
 
@@ -53,9 +56,11 @@ export default function AdminDashboard() {
     const [productToDelete, setProductToDelete] = useState<number | null>(null);
     const [showProductDeletedSuccessNotification, setShowProductDeletedSuccessNotification] = useState(false);
     const [showProductAddedSuccessNotification, setShowProductAddedSuccessNotification] = useState(false);
-    // const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+    const [showProductUpdatedSuccessNotification, setShowProductUpdatedSuccessNotification] = useState(false);
+    const [isProductUpdateModalOpen, setIsProductUpdateModalOpen] = useState(false);
     const [isProductAddModalOpen, setIsProductAddModalOpen] = useState(false);
     const [isProductDeleteModalOpen, setIsProductDeleteModalOpen] = useState(false);
+    const [productToUpdate, setProductToUpdate] = useState<number | null>(null);
 
     // USER SECTION
     const [userToDelete, setUserToDelete] = useState<number | null>(null);
@@ -76,31 +81,39 @@ export default function AdminDashboard() {
     const profileDropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
+    useEffect(() => {
+        const toastFlag = JSON.parse(localStorage.getItem('toastFlag') || 'false');
+        if (toastFlag) {
+            const timer = setTimeout(() => {
+                toast.success('Logged In Successfully', {
+                    position: 'top-center',
+                    autoClose: 2000,
+                    hideProgressBar: false,
+                    closeOnClick: false,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                    theme: 'light',
+                    transition: Bounce,
+                });
+                localStorage.setItem('toastFlag', JSON.stringify(false));
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
-    const toastFlag = JSON.parse(localStorage.getItem("toastFlag") || "[]")
-    if (toastFlag) {
-        toast.success('Logged In Successfully', {
-            position: "top-center",
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: false,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "light",
-            transition: Bounce,
-        });
-    }
-    localStorage.setItem("toastFlag", JSON.stringify(false))
+    // INITIAL DATA FETCHING
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setLoading(true);
                 const userResponse = await get_all_users();
                 setUsers(userResponse);
                 setOriginalUsers(userResponse);
 
                 const productResponse = await get_all_products();
                 setProducts(productResponse.data.data);
+                setOriginalProducts(productResponse.data.data);
 
                 const userCountResponse = await get_all_users_count();
                 setTotalUser(userCountResponse);
@@ -120,7 +133,10 @@ export default function AdminDashboard() {
                 const inactiveProductResponse = await get_all_in_active_products();
                 setInactiveProduct(inactiveProductResponse);
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error('Error fetching data:', error);
+                toast.error('Failed to load dashboard data.', { position: 'top-center' });
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -134,13 +150,14 @@ export default function AdminDashboard() {
     };
     const refreshData = async () => {
         try {
-
+            setLoading(true);
             const userResponse = await get_all_users();
             setUsers(userResponse);
             setOriginalUsers(userResponse);
 
             const productResponse = await get_all_products();
             setProducts(productResponse.data.data);
+            setOriginalProducts(productResponse.data.data);
 
             const userCountResponse = await get_all_users_count();
             setTotalUser(userCountResponse);
@@ -159,13 +176,13 @@ export default function AdminDashboard() {
 
             const inactiveProductResponse = await get_all_in_active_products();
             setInactiveProduct(inactiveProductResponse);
-
         } catch (error) {
-            console.error("Error refreshing users:", error);
+            console.error('Error refreshing data:', error);
+            toast.error('Failed to refresh data.', { position: 'top-center' });
+        } finally {
+            setLoading(false);
         }
     };
-
-
 
     // ADMIN DASHBOARD
     // PROFILE DOWPDOWN
@@ -305,7 +322,7 @@ export default function AdminDashboard() {
     // CLOSES USER NOTIFICATION 
     const handleUserCloseNotification = () => {
         setShowUserRegisteredSuccessNotification(false);
-        setShowUpdateNotification(false);
+        // setShowUpdateNotification(false);
         setShowUserDeletedSuccessNotification(false);
         setShowUserUpdateNotification(false);
     };
@@ -433,11 +450,8 @@ export default function AdminDashboard() {
     // SEARCHING AND SORTING
     const updateUsersList = (search: string, sort: string) => {
         let filtered = [...originalUsers];
-
-        // Search
+        // SEARCH
         if (search) {
-            console.log("search", search);
-
             const lowerSearch = search.toLowerCase();
             filtered = filtered.filter(user =>
                 user.first_name.toLowerCase().includes(lowerSearch) ||
@@ -446,24 +460,25 @@ export default function AdminDashboard() {
             );
         }
 
-        // Sort
-        if (sort === "ascending") {
+        // SORT
+        if (sort === "name") {
             filtered.sort((a, b) => a.first_name.localeCompare(b.first_name));
-        } else if (sort === "descending") {
-            filtered.sort((a, b) => b.first_name.localeCompare(a.first_name));
+        } else if (sort === "oldest") {
+            filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        } else if (sort === "newest") {
+            filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         }
-
         setUsers(filtered);
     };
 
-    const handleSearchChange = (e: React.FormEvent) => {
+    const handleUserSearchChange = (e: React.FormEvent) => {
         const inputField = e.target as HTMLInputElement
         const value = inputField.value;
         setSearchTerm(value);
         updateUsersList(value, sortOption);
     };
 
-    const handleSortChange = (e: React.FormEvent) => {
+    const handleUserSortChange = (e: React.FormEvent) => {
         const inputField = e.target as HTMLInputElement
         const value = inputField.value;
         setSortOption(value);
@@ -481,7 +496,7 @@ export default function AdminDashboard() {
     };
 
     // PRODUCTS ADD
-    const productInitialValues: ProductDetailsBody = {
+    const productAddInitialValues: ProductDetailsBody = {
         title: '',
         description: '',
         category: '',
@@ -498,7 +513,7 @@ export default function AdminDashboard() {
         returnpolicy: ''
     }
     const productAddFormik = useFormik({
-        initialValues: productInitialValues,
+        initialValues: productAddInitialValues,
         validationSchema: productAddSchema,
         validateOnChange: true,
         validateOnBlur: true,
@@ -557,6 +572,144 @@ export default function AdminDashboard() {
             console.log("Product ID is null or undefined.");
         }
     };
+
+    // PRODUCT UPDATE
+    const productUpdateInitialValues: ProductUpdateBody = {
+        title: '',
+        description: '',
+        category: '',
+        price: '',
+        images: [''],
+        thumbnail: '',
+        discountpercentage: '',
+        rating: '',
+        stock: '',
+        brand: '',
+        warrantyinformation: '',
+        shippinginformation: '',
+        availabilitystatus: '',
+        returnpolicy: '',
+        status: ''
+    }
+    const productUpdateFormik = useFormik({
+        initialValues: productUpdateInitialValues,
+        validationSchema: productAddSchema,
+        validateOnChange: true,
+        validateOnBlur: true,
+        onSubmit: async (values, { setSubmitting, resetForm }) => {
+            try {
+                setSubmitError(null);
+                const response = await update_product_by_id(productToUpdate, values);
+                if (response.status) {
+                    setIsProductUpdateModalOpen(false);
+                    resetForm();
+                    await refreshData();
+                    setShowProductUpdatedSuccessNotification(true);
+                    setTimeout(() => {
+                        setShowProductUpdatedSuccessNotification(false);
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error("Error during login:", error);
+                // Handle backend error messages
+                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
+                } else {
+                    setSubmitError("An unexpected error occurred. Please try again.");
+                }
+            } finally {
+                setSubmitting(false);
+            }
+        }
+    });
+    const handleProductUpdateSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitError(null);
+        productUpdateFormik.setTouched({
+            title: true,
+            description: true,
+            category: true,
+            price: true,
+            images: true,
+            thumbnail: true,
+            discountpercentage: true,
+            rating: true,
+            stock: true,
+            brand: true,
+            warrantyinformation: true,
+            shippinginformation: true,
+            availabilitystatus: true,
+            returnpolicy: true
+        });
+        setTimeout(() => {
+            productUpdateFormik.handleSubmit();
+        }, 0);
+    };
+    const handleProductEditClick = async (id: number) => {
+        const response = await get_product_by_id(id)
+        console.log(response);
+        if (response.status === 200) {
+            setIsProductUpdateModalOpen(true);
+            setProductToUpdate(id);
+            productUpdateFormik.setValues({
+                title: response.data.data.title,
+                description: response.data.data.description,
+                category: response.data.data.category,
+                price: response.data.data.price,
+                images: response.data.data.images,
+                thumbnail: response.data.data.thumbnail,
+                discountpercentage: response.data.data.discountpercentage,
+                rating: response.data.data.rating,
+                stock: response.data.data.stock,
+                brand: response.data.data.brand,
+                warrantyinformation: response.data.data.warrantyinformation,
+                shippinginformation: response.data.data.shippinginformation,
+                availabilitystatus: response.data.data.availabilitystatus,
+                returnpolicy: response.data.data.returnpolicy
+            });
+        }
+    };
+
+
+
+    // SEARCHING AND SORTING PRODUCTS
+    const updateProductsList = (search: string, sort: string) => {
+        let filtered = [...originalProducts];
+        // SEARCH
+        if (search) {
+            const lowerSearch = search.toLowerCase();
+            filtered = filtered.filter(product =>
+                product.title.toLowerCase().includes(lowerSearch)
+            );
+        }
+
+        // SORT
+        if (sort === "oldest") {
+            filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        } else if (sort === "newest") {
+            filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        } else if (sort === "price") {
+            filtered.sort((a, b) => a.price - b.price);
+        } else if (sort === "stock") {
+            filtered.sort((a, b) => a.stock - b.stock);
+        }
+        setProducts(filtered);
+    };
+
+    const handleProductSearchChange = (e: React.FormEvent) => {
+        const inputField = e.target as HTMLInputElement
+        const value = inputField.value;
+        setSearchTerm(value);
+        updateProductsList(value, sortOption);
+    };
+
+    const handleProductSortChange = (e: React.FormEvent) => {
+        const inputField = e.target as HTMLInputElement
+        const value = inputField.value;
+        setSortOption(value);
+        updateProductsList(searchTerm, value);
+    };
+
     return (
         <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
             {/* Toast */}
@@ -630,6 +783,22 @@ export default function AdminDashboard() {
                         <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
                         <div className="flex-grow">
                             <p className="font-medium text-green-800">Product Added Successfully!</p>
+                        </div>
+                        <button
+                            onClick={handleProductCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showProductUpdatedSuccessNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">Product Updated Successfully!</p>
                         </div>
                         <button
                             onClick={handleProductCloseNotification}
@@ -1369,6 +1538,350 @@ export default function AdminDashboard() {
             )}
             {/* PRODUCT ADD MODAL END*/}
 
+
+            {/* PRODUCT UPPDATE MODAL START*/}
+            {isProductUpdateModalOpen && (
+                <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
+                        <div className="flex justify-between items-center p-4 border-b mb-5">
+                            <h2 className="text-xl font-semibold text-gray-800">Update Product</h2>
+                            <button onClick={() => setIsProductUpdateModalOpen(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        {submitError && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                {submitError}
+                            </div>
+                        )}
+                        <form className="space-y-6" onSubmit={handleProductUpdateSubmit}>
+                            <div>
+                                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <input
+                                    id="title"
+                                    name="title"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.title && productUpdateFormik.errors.title
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Title"
+                                    value={productUpdateFormik.values.title}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.title && productUpdateFormik.errors.title && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.title}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea
+                                    id="description"
+                                    name="description"
+                                    rows={4}
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.description && productUpdateFormik.errors.description
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Description"
+                                    value={productUpdateFormik.values.description}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.description && productUpdateFormik.errors.description && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.description}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select
+                                    id="category"
+                                    name="category"
+                                    value={productUpdateFormik.values.category}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                    className={`pl-2 block w-full rounded-lg border cursor-pointer ${productUpdateFormik.touched.category && productUpdateFormik.errors.category
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                >
+                                    <option value="" disabled>Select Category</option>
+                                    <option value="beauty">Beauty</option>
+                                    <option value="fragrances">Fragnances</option>
+                                    <option value="furniture">Furniture</option>
+                                    <option value="groceries">Groceries</option>
+                                </select>
+                                {productUpdateFormik.touched.category && productUpdateFormik.errors.category && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.category}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                                <input
+                                    id="price"
+                                    name="price"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.price && productUpdateFormik.errors.price
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Price"
+                                    value={productUpdateFormik.values.price}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.price && productUpdateFormik.errors.price && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.price}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="images" className="block text-sm font-medium text-gray-700 mb-1">Images</label>
+                                <input
+                                    id="images"
+                                    name="images"
+                                    type="url"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.images && productUpdateFormik.errors.images
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Images"
+                                    value={productUpdateFormik.values.images[0]}
+                                    onChange={(e) => productUpdateFormik.setFieldValue('images', [e.target.value])}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.images && productUpdateFormik.errors.images && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.images}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="thumbnail" className="block text-sm font-medium text-gray-700 mb-1">Thumbnail</label>
+                                <input
+                                    id="thumbnail"
+                                    name="thumbnail"
+                                    type="url"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.thumbnail && productUpdateFormik.errors.thumbnail
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Thumbnail"
+                                    value={productUpdateFormik.values.thumbnail}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.thumbnail && productUpdateFormik.errors.thumbnail && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.thumbnail}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="discountpercentage" className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage (0-100)</label>
+                                <input
+                                    id="discountpercentage"
+                                    name="discountpercentage"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.discountpercentage && productUpdateFormik.errors.discountpercentage
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Discount Percentage"
+                                    value={productUpdateFormik.values.discountpercentage}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.discountpercentage && productUpdateFormik.errors.discountpercentage && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.discountpercentage}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700 mb-1">Rating (0-5)</label>
+                                <input
+                                    id="rating"
+                                    name="rating"
+                                    type="number"
+                                    step="0.01"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.rating && productUpdateFormik.errors.rating
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Rating"
+                                    value={productUpdateFormik.values.rating}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.rating && productUpdateFormik.errors.rating && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.rating}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                                <input
+                                    id="stock"
+                                    name="stock"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.stock && productUpdateFormik.errors.stock
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Stock"
+                                    value={productUpdateFormik.values.stock}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.stock && productUpdateFormik.errors.stock && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.stock}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                                <input
+                                    id="brand"
+                                    name="brand"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.brand && productUpdateFormik.errors.brand
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Brand"
+                                    value={productUpdateFormik.values.brand}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.brand && productUpdateFormik.errors.brand && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.brand}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="warrantyinformation" className="block text-sm font-medium text-gray-700 mb-1">Warranty Information</label>
+                                <input
+                                    id="warrantyinformation"
+                                    name="warrantyinformation"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.warrantyinformation && productUpdateFormik.errors.warrantyinformation
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Warranty Information"
+                                    value={productUpdateFormik.values.warrantyinformation}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.warrantyinformation && productUpdateFormik.errors.warrantyinformation && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.warrantyinformation}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="shippinginformation" className="block text-sm font-medium text-gray-700 mb-1">Shipping Information</label>
+                                <input
+                                    id="shippinginformation"
+                                    name="shippinginformation"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.shippinginformation && productAddFormik.errors.shippinginformation
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Shipping Information"
+                                    value={productUpdateFormik.values.shippinginformation}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.shippinginformation && productUpdateFormik.errors.shippinginformation && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.shippinginformation}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="availabilitystatus" className="block text-sm font-medium text-gray-700 mb-1">Availability Status</label>
+                                <input
+                                    id="availabilitystatus"
+                                    name="availabilitystatus"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.availabilitystatus && productUpdateFormik.errors.availabilitystatus
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Availability Status"
+                                    value={productUpdateFormik.values.availabilitystatus}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.availabilitystatus && productUpdateFormik.errors.availabilitystatus && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.availabilitystatus}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="returnpolicy" className="block text-sm font-medium text-gray-700 mb-1">Return Policy</label>
+                                <input
+                                    id="returnpolicy"
+                                    name="returnpolicy"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.returnpolicy && productUpdateFormik.errors.returnpolicy
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Return Policy"
+                                    value={productUpdateFormik.values.returnpolicy}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                />
+                                {productUpdateFormik.touched.returnpolicy && productUpdateFormik.errors.returnpolicy && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.returnpolicy}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select
+                                    id="status"
+                                    name="status"
+                                    value={productUpdateFormik.values.status}
+                                    onChange={productUpdateFormik.handleChange}
+                                    onBlur={productUpdateFormik.handleBlur}
+                                    className={`block w-full rounded-lg border ${productUpdateFormik.touched.status && productUpdateFormik.errors.status
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                >
+                                    <option value="" disabled>Select Status</option>
+                                    <option value="1">Active</option>
+                                    <option value="2">In-Active</option>
+                                </select>
+                                {productUpdateFormik.touched.status && productUpdateFormik.errors.status && (
+                                    <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.status}</p>
+                                )}
+                            </div>
+                            <div>
+                                <button
+                                    type="submit"
+                                    disabled={productUpdateFormik.isSubmitting}
+                                    className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition duration-150 ease-in-out cursor-pointer disabled:opacity-70"
+                                >
+                                    {productUpdateFormik.isSubmitting ? "Updating Product..." : "Update Product"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* PRODUCT UPDATE MODAL END*/}
+
+
+
+
+
+
+
+
             {/* Mobile menu button */}
             <div className="md:hidden fixed top-4 left-4 z-50">
                 <button
@@ -1459,97 +1972,106 @@ export default function AdminDashboard() {
                     {/* DASHBOARD / HOME PAGE START*/}
                     {activePage === 'home' && (
                         <div className="space-y-6 w-full mt-12 mb-20">
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-4 w-full">
-                                    <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                        <Users size={24} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-500">Total Users</p>
-                                        <h3 className="text-2xl font-bold text-gray-800">{stats.totalUsers}</h3>
-                                    </div>
+                            {loading ? (
+                                <div className="flex justify-center items-center h-64">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
                                 </div>
-
-                                <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-4 w-full">
-                                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                        <Package size={24} />
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-4 w-full">
+                                            <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                                <Users size={24} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-500">Total Users</p>
+                                                <h3 className="text-2xl font-bold text-gray-800">{stats.totalUsers}</h3>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-4 w-full">
+                                            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                                <Package size={24} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-500">Total Products</p>
+                                                <h3 className="text-2xl font-bold text-gray-800">{stats.totalProducts}</h3>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-500">Total Products</p>
-                                        <h3 className="text-2xl font-bold text-gray-800">{stats.totalProducts}</h3>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <div className="bg-white rounded-xl shadow-sm p-6">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-4">User Status</h3>
+                                            <div className="h-72 flex items-center justify-center">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={userData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={60}
+                                                            outerRadius={90}
+                                                            fill="#8884d8"
+                                                            paddingAngle={5}
+                                                            dataKey="value"
+                                                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                            isAnimationActive={true}
+                                                            animationBegin={0}
+                                                            animationDuration={1500}
+                                                            animationEasing="ease-in-out"
+                                                        >
+                                                            {userData.map((_, index) => (
+                                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip formatter={(value) => `${value} users`} />
+                                                        <Legend />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="mt-4 flex justify-between text-sm text-gray-500">
+                                                <div>Total Users: {stats.totalUsers}</div>
+                                                <div>Active: {stats.activeUsers}</div>
+                                                <div>Inactive: {stats.inactiveUsers}</div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-xl shadow-sm p-6">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-4">Product Status</h3>
+                                            <div className="h-72 flex items-center justify-center">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={productData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={60}
+                                                            outerRadius={90}
+                                                            fill="#8884d8"
+                                                            paddingAngle={5}
+                                                            dataKey="value"
+                                                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                            isAnimationActive={true}
+                                                            animationBegin={0}
+                                                            animationDuration={1500}
+                                                            animationEasing="ease-in-out"
+                                                        >
+                                                            {productData.map((_, index) => (
+                                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip formatter={(value) => `${value} products`} />
+                                                        <Legend />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="mt-4 flex justify-between text-sm text-gray-500">
+                                                <div>Total Products: {stats.totalProducts}</div>
+                                                <div>Active: {stats.activeProducts}</div>
+                                                <div>Removed: {stats.removedProducts}</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Charts Row - Pie Charts */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Users Pie Chart */}
-                                <div className="bg-white rounded-xl shadow-sm p-6">
-                                    <h3 className="text-lg font-bold text-gray-800 mb-4">User Status</h3>
-                                    <div className="h-72 flex items-center justify-center">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={userData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={60}
-                                                    outerRadius={90}
-                                                    fill="#8884d8"
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                >
-                                                    {userData.map((_, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip formatter={(value) => `${value} users`} />
-                                                <Legend />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="mt-4 flex justify-between text-sm text-gray-500">
-                                        <div>Total Users: {stats.totalUsers}</div>
-                                        <div>Active: {stats.activeUsers}</div>
-                                        <div>Inactive: {stats.inactiveUsers}</div>
-                                    </div>
-                                </div>
-
-                                {/* Products Pie Chart */}
-                                <div className="bg-white rounded-xl shadow-sm p-6">
-                                    <h3 className="text-lg font-bold text-gray-800 mb-4">Product Status</h3>
-                                    <div className="h-72 flex items-center justify-center">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={productData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={60}
-                                                    outerRadius={90}
-                                                    fill="#8884d8"
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                >
-                                                    {productData.map((_, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip formatter={(value) => `${value} products`} />
-                                                <Legend />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="mt-4 flex justify-between text-sm text-gray-500">
-                                        <div>Total Products: {stats.totalProducts}</div>
-                                        <div>Active: {stats.activeProducts}</div>
-                                        <div>Removed: {stats.removedProducts}</div>
-                                    </div>
-                                </div>
-                            </div>
+                                </>
+                            )}
                         </div>
                     )}
                     {/* DASHBOARD / HOME PAGE END*/}
@@ -1564,21 +2086,20 @@ export default function AdminDashboard() {
                                         {/* Search */}
                                         <input
                                             type="text"
-                                            placeholder="Search Users"
-                                            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            onChange={handleSearchChange}
+                                            placeholder="Search Users By Name"
+                                            className="px-3 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            onChange={handleUserSearchChange}
                                         />
-
                                         {/* Sort */}
                                         <select
-                                            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            onChange={handleSortChange}
+                                            className="px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                            onChange={handleUserSortChange}
                                         >
                                             <option value="">Sort By</option>
-                                            <option value="ascending">First Name (A-Z)</option>
-                                            <option value="descending">First Name (Z-A)</option>
+                                            <option value="name" className='text-sm'>Name</option>
+                                            <option value="oldest" className='text-sm'>Oldest</option>
+                                            <option value="newest" className='text-sm'>Newest</option>
                                         </select>
-
                                         <button
                                             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer"
                                             onClick={() => setIsUserAddModalOpen(true)}
@@ -1606,7 +2127,7 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center">
                                                         <div className="h-10 w-10 flex-shrink-0 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                                            {user?.first_name.charAt(0)}{user?.last_name.charAt(0)}
+                                                            {user?.first_name.charAt(0).toUpperCase()}{user?.last_name.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div className="ml-4">
                                                             <div className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</div>
@@ -1678,11 +2199,32 @@ export default function AdminDashboard() {
                     {activePage === 'products' && (
                         <div className="bg-white rounded-xl shadow-sm overflow-hidden w-full">
                             <div className="p-6 border-b border-gray-200">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-bold text-gray-800">Products List</h3>
-                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsProductAddModalOpen(true)}>
-                                        Add New Product
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        {/* Search */}
+                                        <input
+                                            type="text"
+                                            placeholder="Search Products By Title "
+                                            className="px-3 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            onChange={handleProductSearchChange}
+                                        />
+                                        {/* Sort */}
+                                        <select
+                                            className="px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                                            onChange={handleProductSortChange}
+                                        >
+                                            <option value="">Sort By</option>
+                                            <option value="oldest" className='text-sm'>Oldest</option>
+                                            <option value="newest" className='text-sm'>Newest</option>
+                                            <option value="price" className='text-sm'>Price</option>
+                                            <option value="stock" className='text-sm'>Stock</option>
+                                        </select>
+
+                                        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsProductAddModalOpen(true)}>
+                                            Add New Product
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1732,7 +2274,7 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <div className="flex items-center gap-3">
-                                                        <button className="text-indigo-600 hover:text-indigo-900 cursor-pointer">
+                                                        <button className="text-indigo-600 hover:text-indigo-900 cursor-pointer" onClick={() => handleProductEditClick(product.id)}>
                                                             <Edit size={18} />
                                                         </button>
                                                         <button
