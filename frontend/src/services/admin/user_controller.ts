@@ -57,7 +57,7 @@ export const delete_user_by_id = async (userId: number) => {
 export const add_new_user = async (userData: AdminUserRegistration) => {
     try {
         const response = await api.post("/admin/user/register/", userData);
-        return response.data;
+        return response;
     } catch (error) {
         console.error("Error adding user:", error);
         throw error;
@@ -67,11 +67,7 @@ export const add_new_user = async (userData: AdminUserRegistration) => {
 // FUNCTION TO GET USER BY ID
 export const get_user_by_id = async (userId: number) => {
     try {
-        console.log("INSIDE GET USER FUNCTION", userId);
-
         const response = await api.get(`/admin/user/${userId}`);
-        console.log(response.data.data, "USER DATA");
-
         return response.data.data;
     } catch (error) {
         console.error("Error fetching user:", error);
@@ -82,9 +78,8 @@ export const get_user_by_id = async (userId: number) => {
 // FUNCTION TO UPDATE USER BY ID
 export const update_user_by_id = async (userId: number, userData: AdminUserUpdate) => {
     try {
-        console.log("INSIDE UPDATE USER FUNCTION", userId, userData);
         const response = await api.put(`/admin/user/${userId}`, userData);
-        return response.data;
+        return response;
     } catch (error) {
         console.error("Error updating user:", error);
         throw error;

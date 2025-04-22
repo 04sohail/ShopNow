@@ -1,4 +1,4 @@
-import * as Yup from 'yup';
+import * as Yup from 'Yup';
 
 
 export const login_schema = Yup.object().shape({
@@ -109,4 +109,84 @@ export const resetPasswordSchema = Yup.object({
         .matches(/[0-9]/, "Must have one number")
         .matches(/[!@#$%^&*()\-_=+[\]{};:',.<>/?\\|]/, "Must have one special character")
         .matches(/^[^\s]*$/, "No spaces allowed"),
+});
+
+
+
+
+export const productAddSchema = Yup.object().shape({
+    title: Yup
+        .string()
+        .required('Title is required')
+        .max(255, 'Title must be at most 255 characters'),
+    description: Yup.string().required('Description is required'),
+    category: Yup
+        .string()
+        .required('Category is required')
+        .oneOf(
+            ['beauty', 'fragrances', 'furniture', 'groceries'],
+            'Category must be one of: beauty, fragrances, furniture, groceries'
+        ),
+    price: Yup
+        .number()
+        .required('Price is required')
+        .positive('Price must be greater than 0')
+        .typeError('Price must be a number'),
+    images: Yup
+        .array()
+        .of(
+            Yup
+                .string()
+                .url('Must be a valid URL')
+                .required('Image URL is required')
+        )
+        .min(1, 'At least one image is required'),
+    thumbnail: Yup
+        .string()
+        .url('Thumbnail must be a valid URL')
+        .required('Thumbnail is required'),
+    discountpercentage: Yup
+        .number()
+        .nullable()
+        .min(0, 'Discount percentage must be at least 0')
+        .max(100, 'Discount percentage must be at most 100')
+        .typeError('Discount percentage must be a number')
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    rating: Yup
+        .number()
+        .nullable()
+        .min(0, 'Rating must be at least 0')
+        .max(5, 'Rating must be at most 5')
+        .typeError('Rating must be a number')
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    stock: Yup
+        .number()
+        .required('Stock is required')
+        .nullable()
+        .integer('Stock must be an integer')
+        .min(0, 'Stock must be at least 0')
+        .typeError('Stock must be a number')
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    brand: Yup
+        .string()
+        .nullable()
+        .max(255, 'Brand must be at most 255 characters')
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    warrantyinformation: Yup
+        .string()
+        .nullable()
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    shippinginformation: Yup
+        .string()
+        .nullable()
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    availabilitystatus: Yup
+        .string()
+        .nullable()
+        .max(255, 'Availability status must be at most 255 characters')
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
+    returnpolicy: Yup
+        .string()
+        .nullable()
+        .transform((value, originalValue) => (originalValue === '' ? null : value)),
 });

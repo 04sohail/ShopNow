@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Product_services } from '../services/product_services'
-import { Product, ProductResponse } from '../types/types'
+import { ProductDetails } from '../types/types'
 import { useNavigate } from "react-router-dom";
 import { Bounce, toast, ToastContainer } from 'react-toastify';
-const PRODUCT_SERVICES = new Product_services()
-
+import { get_all_products } from '../services/admin/products_controller';
 
 const Landing_page_section = () => {
     const toastFlag = JSON.parse(localStorage.getItem("toastFlag") || "[]")
@@ -20,13 +18,14 @@ const Landing_page_section = () => {
             theme: "light",
             transition: Bounce,
         });
-        localStorage.setItem("toastFlag", JSON.stringify(false))
     }
+    localStorage.setItem("toastFlag", JSON.stringify(false))
+
     const navigate = useNavigate()
-    const [products, setProducts] = useState<Product[]>([])
+    const [products, setProducts] = useState<ProductDetails[]>([] as ProductDetails[])
     const getProducts = async () => {
-        const products: ProductResponse = await PRODUCT_SERVICES.GetProducts()
-        setProducts(products.products)
+        const products: ProductDetails[] = await get_all_products()
+        setProducts(products)
     }
     useEffect(() => {
         getProducts()
@@ -57,7 +56,7 @@ const Landing_page_section = () => {
             <section className="text-gray-600 body-font ml-20 cursor-pointer">
                 <div className="container px-5 py-24 mx-auto">
                     <div className="flex flex-wrap -m-4">
-                        {products.map((product: Product, index: number) => (
+                        {products && products.map((product: ProductDetails, index: number) => (
                             <div key={index} id={product.id.toString()} onClick={() => handleProdDetails(product.id)} className="lg:w-1/4 md:w-1/2 p-4 w-full ">
                                 <a className="block relative h-48 rounded overflow-hidden">
                                     <img

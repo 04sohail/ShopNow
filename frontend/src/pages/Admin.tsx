@@ -3,7 +3,6 @@ import {
     Home,
     Users,
     ShoppingBag,
-    Search,
     User,
     Edit,
     Trash2,
@@ -23,15 +22,17 @@ import {
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id, add_new_user, get_user_by_id, update_user_by_id } from '../services/admin/user_controller';
-import { get_all_products_count, get_all_active_products, get_all_in_active_products } from '../services/admin/products_controller';
-import { AdminUsers } from '../types/types';
+import { get_all_products_count, get_all_active_products, get_all_in_active_products, get_all_products, delete_product_by_id, add_new_product } from '../services/admin/products_controller';
+import { AdminUsers, ProductDetails, ProductDetailsBody } from '../types/types';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
-import { adminUpdateUserSchema, signupSchema } from '../utils/validations';
+import { adminUpdateUserSchema, signupSchema, productAddSchema } from '../utils/validations';
+import { Bounce, toast, ToastContainer } from 'react-toastify';
 
 
 export default function AdminDashboard() {
     // State variables
+    // DASHBOARD SECTION
     const [users, setUsers] = useState<AdminUsers[]>([]);
     const [totalUser, setTotalUser] = useState(0);
     const [totalProduct, setTotalProduct] = useState(0);
@@ -39,37 +40,61 @@ export default function AdminDashboard() {
     const [inactiveUser, setInactiveUser] = useState(0);
     const [activeProduct, setActiveProduct] = useState(0);
     const [inactiveProduct, setInactiveProduct] = useState(0);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [userToDelete, setUserToDelete] = useState<number | null>(null);
+    const [isDeleteModalOpen, setIsUserDeleteModalOpen] = useState(false);
+
+    // ERROR SECTION
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+
+    // PRODUCT SECTION
+    const [productToDelete, setProductToDelete] = useState<number | null>(null);
+    const [showProductDeletedSuccessNotification, setShowProductDeletedSuccessNotification] = useState(false);
+    const [showProductAddedSuccessNotification, setShowProductAddedSuccessNotification] = useState(false);
     const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+    const [isProductAddModalOpen, setIsProductAddModalOpen] = useState(false);
+    const [isProductDeleteModalOpen, setIsProductDeleteModalOpen] = useState(false);
+    // USER SECTION
+    const [userToDelete, setUserToDelete] = useState<number | null>(null);
+    const [showUserRegisteredSuccessNotification, setShowUserRegisteredSuccessNotification] = useState(false);
+    const [showUserDeletedSuccessNotification, setShowUserDeletedSuccessNotification] = useState(false);
+    const [isUserAddModalOpen, setIsUserAddModalOpen] = useState(false);
+    const [showUserUpdateNotification, setShowUserUpdateNotification] = useState(false);
+    const [userToUpdate, setUserToUpdate] = useState<number | null>(null);
+
+    // PAGINATION SECTION   
     const [currentUserPage, setCurrentUserPage] = useState(1);
     const [currentProductPage, setCurrentProductPage] = useState(1);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [activePage, setActivePage] = useState('home');
-    const [isOpen, setIsOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-    const [userToUpdate, setUserToUpdate] = useState<number | null>(null);
+    const [isUserUpdateModalOpen, setIsUserUpdateModalOpen] = useState(false);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
-    // USER DATA
-    const user = JSON.parse(sessionStorage.getItem("logged_in_user") || "{}");
-    // LOGOUT
-    const handleLogout = () => {
-        sessionStorage.removeItem("logged_in_user");
-        setIsProfileDropdownOpen(false);
-        navigate("/login");
-    };
-    // Fetch all required data when the component mounts
+
+    const toastFlag = JSON.parse(localStorage.getItem("toastFlag") || "[]")
+    if (toastFlag) {
+        toast.success('Logged In Successfully', {
+            position: "top-center",
+            autoClose: 2000,
+            hideProgressBar: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: true,
+            progress: undefined,
+            theme: "light",
+            transition: Bounce,
+        });
+    }
+    localStorage.setItem("toastFlag", JSON.stringify(false))
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const userResponse = await get_all_users();
                 setUsers(userResponse);
+
+                const productResponse = await get_all_products();
+                setProducts(productResponse);
 
                 const userCountResponse = await get_all_users_count();
                 setTotalUser(userCountResponse);
@@ -95,13 +120,20 @@ export default function AdminDashboard() {
 
         fetchData();
     }, []);
-
-    const refreshUsers = async () => {
+    // LOGOUT
+    const handleLogout = () => {
+        sessionStorage.removeItem("logged_in_user");
+        setIsProfileDropdownOpen(false);
+        navigate("/login");
+    };
+    const refreshData = async () => {
         try {
 
             const userResponse = await get_all_users();
             setUsers(userResponse);
-            console.log("Users refreshed:", userResponse);
+
+            const productResponse = await get_all_products();
+            setProducts(productResponse);
 
             const userCountResponse = await get_all_users_count();
             setTotalUser(userCountResponse);
@@ -111,11 +143,49 @@ export default function AdminDashboard() {
 
             const inactiveUserResponse = await get_all_in_active_users();
             setInactiveUser(inactiveUserResponse);
-            console.log("Refreshing users...");
+
+            const productCountResponse = await get_all_products_count();
+            setTotalProduct(productCountResponse);
+
+            const activeProductResponse = await get_all_active_products();
+            setActiveProduct(activeProductResponse);
+
+            const inactiveProductResponse = await get_all_in_active_products();
+            setInactiveProduct(inactiveProductResponse);
+
         } catch (error) {
             console.error("Error refreshing users:", error);
         }
     };
+
+
+
+    // ADMIN DASHBOARD
+    // PROFILE DOWPDOWN
+    const handleOutsideClick = (event: MouseEvent) => {
+        if (
+            profileDropdownRef.current &&
+            !profileDropdownRef.current.contains(event.target as Node)
+        ) {
+            setIsProfileDropdownOpen(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isProfileDropdownOpen) {
+            document.addEventListener('mousedown', handleOutsideClick);
+        } else {
+            document.removeEventListener('mousedown', handleOutsideClick);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+        };
+    }, [isProfileDropdownOpen]);
+
+    const user = JSON.parse(sessionStorage.getItem("logged_in_user") || "{}");
+    // HOME SECTION
+    const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444'];
     const stats = {
         totalUsers: totalUser,
         activeUsers: activeUser,
@@ -124,7 +194,6 @@ export default function AdminDashboard() {
         activeProducts: activeProduct,
         removedProducts: inactiveProduct,
     };
-    const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444'];
     const userData = [
         { name: 'Active Users', value: stats.activeUsers },
         { name: 'Inactive Users', value: stats.inactiveUsers }
@@ -135,145 +204,11 @@ export default function AdminDashboard() {
         { name: 'Removed Products', value: stats.removedProducts }
     ];
 
-    // Dummy product data
-    const [products, setProducts] = useState([
-        {
-            id: 1,
-            name: 'Premium Headphones',
-            category: 'Electronics',
-            price: 199.99,
-            stock: 45,
-            sku: 'HDPH-001',
-            brand: 'SoundMax',
-            description: 'Wireless noise-cancelling headphones with premium sound quality',
-            imageUrl: '/images/headphones.jpg'
-        },
-        {
-            id: 2,
-            name: 'Smart Watch Pro',
-            category: 'Electronics',
-            price: 249.99,
-            stock: 32,
-            sku: 'SWTC-002',
-            brand: 'TechGear',
-            description: 'Advanced smartwatch with health monitoring and GPS',
-            imageUrl: '/images/smartwatch.jpg'
-        },
-        {
-            id: 3,
-            name: 'Designer Handbag',
-            category: 'Fashion',
-            price: 499.99,
-            stock: 15,
-            sku: 'HNBG-003',
-            brand: 'LuxStyle',
-            description: 'Premium leather designer handbag with gold accents',
-            imageUrl: '/images/handbag.jpg'
-        },
-        {
-            id: 4,
-            name: 'Gaming Laptop',
-            category: 'Electronics',
-            price: 1299.99,
-            stock: 8,
-            sku: 'GMLP-004',
-            brand: 'PowerPlay',
-            description: 'High-performance gaming laptop with RGB keyboard',
-            imageUrl: '/images/gaming_laptop.jpg'
-        },
-        {
-            id: 5,
-            name: 'Premium Coffee Maker',
-            category: 'Kitchen',
-            price: 129.99,
-            stock: 23,
-            sku: 'CFMK-005',
-            brand: 'BrewMaster',
-            description: 'Programmable coffee maker with thermal carafe',
-            imageUrl: '/images/coffee_maker.jpg'
-        },
-        {
-            id: 6,
-            name: 'Fitness Tracker',
-            category: 'Electronics',
-            price: 89.99,
-            stock: 54,
-            sku: 'FTTK-006',
-            brand: 'ActiveLife',
-            description: 'Waterproof fitness tracker with heart rate monitor',
-            imageUrl: '/images/fitness_tracker.jpg'
-        },
-        {
-            id: 7,
-            name: 'Wireless Earbuds',
-            category: 'Electronics',
-            price: 129.99,
-            stock: 37,
-            sku: 'WRLS-007',
-            brand: 'SoundMax',
-            description: 'True wireless earbuds with charging case',
-            imageUrl: '/images/earbuds.jpg'
-        },
-        {
-            id: 8,
-            name: 'Chef\'s Knife Set',
-            category: 'Kitchen',
-            price: 199.99,
-            stock: 19,
-            sku: 'CFKN-008',
-            brand: 'CulinaryPro',
-            description: 'Professional 8-piece kitchen knife set',
-            imageUrl: '/images/knife_set.jpg'
-        },
-        {
-            id: 9,
-            name: 'Leather Wallet',
-            category: 'Fashion',
-            price: 59.99,
-            stock: 62,
-            sku: 'LWLT-009',
-            brand: 'LuxStyle',
-            description: 'Genuine leather wallet with RFID protection',
-            imageUrl: '/images/wallet.jpg'
-        },
-        {
-            id: 10,
-            name: 'Portable Speaker',
-            category: 'Electronics',
-            price: 79.99,
-            stock: 41,
-            sku: 'SPKR-010',
-            brand: 'SoundMax',
-            description: 'Waterproof bluetooth speaker with 20-hour battery life',
-            imageUrl: '/images/speaker.jpg'
-        },
-        {
-            id: 11,
-            name: 'Yoga Mat',
-            category: 'Fitness',
-            price: 39.99,
-            stock: 75,
-            sku: 'YOGA-011',
-            brand: 'ActiveLife',
-            description: 'Non-slip eco-friendly yoga mat with carry strap',
-            imageUrl: '/images/yoga_mat.jpg'
-        },
-        {
-            id: 12,
-            name: 'Air Purifier',
-            category: 'Home',
-            price: 199.99,
-            stock: 14,
-            sku: 'ARPR-012',
-            brand: 'CleanAir',
-            description: 'HEPA air purifier for rooms up to 500 sq ft',
-            imageUrl: '/images/air_purifier.jpg'
-        }
-    ]);
+    // Product data
+    const [products, setProducts] = useState<ProductDetails[]>([] as ProductDetails[]);
 
     // Pagination state
     const itemsPerPage = 10;
-
     // Calculate pagination
     const indexOfLastUser = currentUserPage * itemsPerPage;
     const indexOfFirstUser = indexOfLastUser - itemsPerPage;
@@ -307,29 +242,7 @@ export default function AdminDashboard() {
         }
     };
 
-    // Handle user deletion
-    const handleDeleteUser = async () => {
-        if (userToDelete !== null) {
-            await delete_user_by_id(userToDelete);
-            setUsers(users.filter(user => user.id !== userToDelete));
-            setIsDeleteModalOpen(false);
-            setUserToDelete(null);
-            await refreshUsers();
-        }
-    };
-    const handleDeleteClick = (id: number) => {
-        setUserToDelete(id);
-        setIsDeleteModalOpen(true);
-    };
-    const handleCancelDelete = () => {
-        setIsDeleteModalOpen(false);
-        setUserToDelete(null);
-    };
-    // DELETE MODAL 
-    // Handle product deletion
-    const handleDeleteProduct = (id: number) => {
-        setProducts(products.filter(product => product.id !== id));
-    };
+
 
     // Navigation items
     const navItems = [
@@ -338,12 +251,42 @@ export default function AdminDashboard() {
         { name: 'Products', icon: <ShoppingBag size={20} />, id: 'products' }
     ];
 
-
-    // ADDING USER
     const errorRef = useRef(null);
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
     };
+    // USERS SECTION START //////////////////////////////////////////////////////////////////////////////
+    // DELETE USER
+    const handleDeleteUser = async () => {
+        if (userToDelete !== null) {
+            try {
+                await delete_user_by_id(userToDelete);
+                await refreshData();
+                setIsUserDeleteModalOpen(false);
+                setUserToDelete(null);
+                setShowUserDeletedSuccessNotification(true);
+                setTimeout(() => {
+                    setShowUserDeletedSuccessNotification(false);
+                }, 2000);
+            }
+            catch (error) {
+                console.error("Error deleting user:", error);
+            }
+        }
+        else {
+            console.log("User ID is null or undefined.");
+        }
+    };
+    const handleUserDeleteClick = (id: number) => {
+        setUserToDelete(id);
+        setIsUserDeleteModalOpen(true);
+    };
+    const handleUserCancelDelete = () => {
+        setUserToDelete(null);
+        setIsUserDeleteModalOpen(false);
+    };
+    // USER SIGNUP //
+    // USER INITIAL VALUES
     const signupInitialValues = {
         first_name: "",
         last_name: "",
@@ -352,29 +295,14 @@ export default function AdminDashboard() {
         mobile_number: "",
         user_type: ""
     };
-
-
-    // Effect to handle notification auto-close and switching to login
-    useEffect(() => {
-        let timer;
-        if (showSuccessNotification) {
-            // First timer: wait a bit to make sure the notification is visible
-            timer = setTimeout(() => {
-                // Second timer: auto close the notification and switch to login
-                const switchTimer = setTimeout(() => {
-                    setShowSuccessNotification(false);
-                    setIsOpen(false); // Close the signup modal
-                }, 2000); // 2 seconds display time for notification
-
-                return () => clearTimeout(switchTimer);
-            }, 200); // Small delay to ensure animation runs properly
-        }
-        return () => clearTimeout(timer);
-    }, [showSuccessNotification]);
-    const handleCloseNotification = () => {
-        setShowSuccessNotification(false);
+    // CLOSES USER NOTIFICATION 
+    const handleUserCloseNotification = () => {
+        setShowUserRegisteredSuccessNotification(false);
+        setShowUpdateNotification(false);
+        setShowUserDeletedSuccessNotification(false);
+        setShowUserUpdateNotification(false);
     };
-    // Signup form handling
+    // SIGNUP FORMIK
     const signupFormik = useFormik({
         initialValues: signupInitialValues,
         validationSchema: signupSchema,
@@ -384,16 +312,18 @@ export default function AdminDashboard() {
             try {
                 setSubmitError(null);
                 // API CALL
-                await add_new_user(values);
-                await refreshUsers();
-                // Show success notification at the top
-                setShowSuccessNotification(true);
-                resetForm();
-
-                // Notification will automatically close and switch to login after timeout
+                const response = await add_new_user(values);
+                if (response.status === 201) {
+                    await refreshData();
+                    setIsUserAddModalOpen(false);
+                    setShowUserRegisteredSuccessNotification(true);
+                    setTimeout(() => {
+                        setShowUserRegisteredSuccessNotification(false);
+                    }, 2000);
+                    resetForm();
+                }
             } catch (error) {
                 console.error("Error during login:", error);
-                // Handle backend error messages
                 if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
                     setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred."); // Set backend message
                 } else {
@@ -419,29 +349,7 @@ export default function AdminDashboard() {
         }, 0);
     };
 
-
-    // UPDATING USER
-    ////////////////////////////
-    // Effect to handle notification auto-close and switching to login
-    useEffect(() => {
-        let timer;
-        if (showUpdateNotification) {
-            // First timer: wait a bit to make sure the notification is visible
-            timer = setTimeout(() => {
-                // Second timer: auto close the notification and switch to login
-                const switchTimer = setTimeout(() => {
-                    setShowUpdateNotification(false);
-                    setIsUpdateModalOpen(false); // Close the signup modal
-                }, 2000); // 2 seconds display time for notification
-
-                return () => clearTimeout(switchTimer);
-            }, 200); // Small delay to ensure animation runs properly
-        }
-        return () => clearTimeout(timer);
-    }, [showUpdateNotification]);
-    const handleUpdateCloseNotification = () => {
-        setShowUpdateNotification(false);
-    };
+    // UPDATING USER //
     const updateInitialValues = {
         first_name: "",
         last_name: "",
@@ -458,30 +366,36 @@ export default function AdminDashboard() {
         onSubmit: async (values, { setSubmitting, resetForm }) => {
             try {
                 setSubmitError(null);
-                // API CALL
-                await update_user_by_id(userToUpdate!, values);
-                setIsUpdateModalOpen(false);
-                setShowUpdateNotification(true);
-                resetForm();
-                await refreshUsers();
-            } catch (error) {
-                console.error("Error during login:", error);
-                // Handle backend error messages
-                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
-                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
-                } else {
-                    setSubmitError("An unexpected error occurred. Please try again.");
+                // API CALL // 
+                const response = await update_user_by_id(userToUpdate!, values);
+                if (response.data.status_code === 200) {
+                    setIsUserUpdateModalOpen(false);
+                    resetForm()
+                    await refreshData();
+                    setShowUserUpdateNotification(true);
+                    setTimeout(() => {
+                        setShowUserUpdateNotification(false);
+                        setIsUserUpdateModalOpen(false);
+                    }, 2000);
                 }
+            } catch (error) {
+                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+                    const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+
+                    if (detail?.includes("Email")) {
+                        updateFormik.setFieldError("email_address", detail);
+                    } else if (detail?.includes("Mobile")) {
+                        updateFormik.setFieldError("mobile_number", detail);
+                    } else {
+                        setSubmitError(detail!);
+                    }
+                }
+
             } finally {
                 setSubmitting(false);
             }
         }
     });
-
-    const handleUpdateModalClose = () => {
-        setIsUpdateModalOpen(false);
-        setUserToUpdate(null);
-    };
     const handleEditClick = async (id: number) => {
         const response = await get_user_by_id(id)
         updateFormik.setValues({
@@ -492,7 +406,7 @@ export default function AdminDashboard() {
             user_type: response.user_type
         });
         setUserToUpdate(id);
-        setIsUpdateModalOpen(true);
+        setIsUserUpdateModalOpen(true);
     };
     const handleUpdateSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -509,31 +423,112 @@ export default function AdminDashboard() {
             updateFormik.handleSubmit();
         }, 0);
     };
+    // USERS SECTION END //////////////////////////////////////////////////////////////////////////////
 
-    const handleOutsideClick = (event: MouseEvent) => {
-        if (
-            profileDropdownRef.current &&
-            !profileDropdownRef.current.contains(event.target as Node)
-        ) {
-            setIsProfileDropdownOpen(false); // Close the modal
-        }
+    // PRODUCT SECTION START //////////////////////////////////////////////////////////////////////////////
+    // CLOSES PRODUCTS NOTIFICATION 
+    const handleProductCloseNotification = () => {
+        setShowProductDeletedSuccessNotification(false);
+        setShowProductAddedSuccessNotification(false);
+        setShowUpdateNotification(false);
     };
 
-    useEffect(() => {
-        if (isProfileDropdownOpen) {
-            document.addEventListener('mousedown', handleOutsideClick);
-        } else {
-            document.removeEventListener('mousedown', handleOutsideClick);
+    // PRODUCTS ADD
+    const productInitialValues: ProductDetailsBody = {
+        title: '',
+        description: '',
+        category: '',
+        price: '',
+        images: [''],
+        thumbnail: '',
+        discountpercentage: '',
+        rating: '',
+        stock: '',
+        brand: '',
+        warrantyinformation: '',
+        shippinginformation: '',
+        availabilitystatus: '',
+        returnpolicy: ''
+    }
+    const productAddFormik = useFormik({
+        initialValues: productInitialValues,
+        validationSchema: productAddSchema,
+        validateOnChange: true,
+        validateOnBlur: true,
+        onSubmit: async (values, { setSubmitting, resetForm }) => {
+            try {
+                setSubmitError(null);
+                const response = await add_new_product(values);
+                if (response === 201) {
+                    setIsProductAddModalOpen(false);
+                    resetForm();
+                    await refreshData();
+                    setShowProductAddedSuccessNotification(true);
+                    setTimeout(() => {
+                        setShowProductAddedSuccessNotification(false);
+                    }, 2000);
+                }
+
+            } catch (error) {
+                console.error("Error during login:", error);
+                // Handle backend error messages
+                if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
+                    setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
+                } else {
+                    setSubmitError("An unexpected error occurred. Please try again.");
+                }
+            } finally {
+                setSubmitting(false);
+            }
         }
-
-        return () => {
-            document.removeEventListener('mousedown', handleOutsideClick);
-        };
-    }, [isProfileDropdownOpen]);
-
+    });
+    // PRODUCT DELETE 
+    const handleProductDeleteClick = (id: number) => {
+        setProductToDelete(id);
+        setIsProductDeleteModalOpen(true);
+    }
+    const handleProductCancelDelete = () => {
+        setProductToDelete(null);
+        setIsProductDeleteModalOpen(false);
+    };
+    const handleProductDelete = async () => {
+        if (productToDelete !== null) {
+            try {
+                const response = await delete_product_by_id(productToDelete);
+                if (response.status_code === 200) {
+                    await refreshData();
+                    setIsProductDeleteModalOpen(false);
+                    setProductToDelete(null);
+                    setShowProductDeletedSuccessNotification(true);
+                    setTimeout(() => {
+                        setShowProductDeletedSuccessNotification(false);
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error("Error deleting product:", error);
+            }
+        } else {
+            console.log("Product ID is null or undefined.");
+        }
+    };
     return (
         <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
-            {showSuccessNotification && (
+            {/* Toast */}
+            <ToastContainer
+                position="top-center"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick={false}
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+                transition={Bounce}
+            />
+            {/* USER NOTIFICATIONS START*/}
+            {showUserRegisteredSuccessNotification && (
                 <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
                     <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
                         <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
@@ -541,15 +536,31 @@ export default function AdminDashboard() {
                             <p className="font-medium text-green-800">Registration Successful!</p>
                         </div>
                         <button
-                            onClick={handleCloseNotification}
-                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none"
+                            onClick={handleUserCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
                         >
                             <X className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
             )}
-            {showUpdateNotification && (
+            {showUserDeletedSuccessNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">User Deleted Successfully!</p>
+                        </div>
+                        <button
+                            onClick={handleUserCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showUserUpdateNotification && (
                 <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
                     <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
                         <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
@@ -557,20 +568,56 @@ export default function AdminDashboard() {
                             <p className="font-medium text-green-800">User Updated Successfully!</p>
                         </div>
                         <button
-                            onClick={handleUpdateCloseNotification}
-                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none"
+                            onClick={handleUserCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
                         >
                             <X className="h-5 w-5" />
                         </button>
                     </div>
                 </div>
             )}
-            {isOpen && (
+            {/* USER NOTIFICATIONS END */}
+            {/* PRODUCTS NOTIFICATIONS START */}
+            {showProductAddedSuccessNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">Product Added Successfully!</p>
+                        </div>
+                        <button
+                            onClick={handleProductCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showProductDeletedSuccessNotification && (
+                <div className="fixed top-4 left-0 right-0 mx-auto w-full max-w-md transform transition-all duration-300 ease-in-out z-100">
+                    <div className="bg-green-50 border-l-4 border-green-500 rounded-lg shadow-md p-4 mx-4 flex items-center">
+                        <CheckCircle className="h-6 w-6 text-green-500 mr-3 flex-shrink-0" />
+                        <div className="flex-grow">
+                            <p className="font-medium text-green-800">Product Deleted Successfully!</p>
+                        </div>
+                        <button
+                            onClick={handleProductCloseNotification}
+                            className="text-green-500 hover:text-green-700 ml-2 focus:outline-none cursor-pointer"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+            )}
+            {/* PRODUCTS NOTIFICATIONS END */}
+            {/* USER ADD MODAL START */}
+            {isUserAddModalOpen && (
                 <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
                         <div className="flex justify-between items-center p-4 border-b mb-5">
                             <h2 className="text-xl font-semibold text-gray-800">Create Account</h2>
-                            <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-gray-700">
+                            <button onClick={() => setIsUserAddModalOpen(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">
                                 <X size={24} />
                             </button>
                         </div>
@@ -749,17 +796,20 @@ export default function AdminDashboard() {
                 </div>
             )
             }
+            {/* USER ADD MODAL END */}
+
+            {/* USER DELETE MODAL START */}
             {
                 isDeleteModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-xs">
                         <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
                             <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
                             <p className="text-sm text-gray-500 mb-6">
-                                Are you sure you want to delete this user? This action cannot be undone.
+                                Are you sure you want to delete this User? This action cannot be undone.
                             </p>
                             <div className="flex justify-end gap-3">
                                 <button
-                                    onClick={handleCancelDelete}
+                                    onClick={handleUserCancelDelete}
                                     className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
                                 >
                                     Cancel
@@ -775,14 +825,16 @@ export default function AdminDashboard() {
                     </div>
                 )
             }
-            {/* UPDATE MODAL START */}
+            {/* USER DELETE MODAL END */}
+
+            {/* USER UPDATE MODAL START */}
             {
-                isUpdateModalOpen && (
+                isUserUpdateModalOpen && (
                     <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
                         <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
                             <div className="flex justify-between items-center p-4 border-b mb-5">
                                 <h2 className="text-xl font-semibold text-gray-800">Update User</h2>
-                                <button onClick={handleUpdateModalClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                                <button onClick={() => setIsUserUpdateModalOpen(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">
                                     <X size={24} />
                                 </button>
                             </div>
@@ -926,12 +978,357 @@ export default function AdminDashboard() {
                     </div>
                 )
             }
-            {/* UPDATE MODAL END */}
+            {/* USER UPDATE MODAL END */}
+
+            {/* PRODUCT DELETE MODAL START */}
+            {
+                isProductDeleteModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 backdrop-blur-xs">
+                        <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Are you sure you want to delete this User? This action cannot be undone.
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={handleProductCancelDelete}
+                                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleProductDelete}
+                                    className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700 cursor-pointer"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            {/* PRODUCT DELETE MODAL END */}
+
+
+            {/* PRODUCT ADD MODAL START*/}
+            {isProductAddModalOpen && (
+                <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
+                        <div className="flex justify-between items-center p-4 border-b mb-5">
+                            <h2 className="text-xl font-semibold text-gray-800">Add New Product Here</h2>
+                            <button onClick={handleProductCloseNotification} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        {submitError && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                {submitError}
+                            </div>
+                        )}
+                        <form className="space-y-6" onSubmit={productAddFormik.handleSubmit}>
+                            <div>
+                                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <input
+                                    id="title"
+                                    name="title"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.title && productAddFormik.errors.title
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Title"
+                                    value={productAddFormik.values.title}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.title && productAddFormik.errors.title && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.title}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea
+                                    id="description"
+                                    name="description"
+                                    rows={4}
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.description && productAddFormik.errors.description
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Description"
+                                    value={productAddFormik.values.description}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.description && productAddFormik.errors.description && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.description}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select
+                                    id="category"
+                                    name="category"
+                                    value={productAddFormik.values.category}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                    className={`pl-2 block w-full rounded-lg border cursor-pointer ${productAddFormik.touched.category && productAddFormik.errors.category
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 text-gray-900 focus:outline-none focus:ring-2`}
+                                >
+                                    <option value="" disabled>Select Category</option>
+                                    <option value="beauty">Beauty</option>
+                                    <option value="fragrances">Fragnances</option>
+                                    <option value="furniture">Furniture</option>
+                                    <option value="groceries">Groceries</option>
+                                </select>
+                                {productAddFormik.touched.category && productAddFormik.errors.category && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.category}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                                <input
+                                    id="price"
+                                    name="price"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.price && productAddFormik.errors.price
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Price"
+                                    value={productAddFormik.values.price}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.price && productAddFormik.errors.price && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.price}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="images" className="block text-sm font-medium text-gray-700 mb-1">Images</label>
+                                <input
+                                    id="images"
+                                    name="images"
+                                    type="url"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.images && productAddFormik.errors.images
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Images"
+                                    value={productAddFormik.values.images[0]}
+                                    onChange={(e) => productAddFormik.setFieldValue('images', [e.target.value])}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.images && productAddFormik.errors.images && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.images}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="thumbnail" className="block text-sm font-medium text-gray-700 mb-1">Thumbnail</label>
+                                <input
+                                    id="thumbnail"
+                                    name="thumbnail"
+                                    type="url"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.thumbnail && productAddFormik.errors.thumbnail
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Thumbnail"
+                                    value={productAddFormik.values.thumbnail}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.thumbnail && productAddFormik.errors.thumbnail && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.thumbnail}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="discountpercentage" className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage (0-100)</label>
+                                <input
+                                    id="discountpercentage"
+                                    name="discountpercentage"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.discountpercentage && productAddFormik.errors.discountpercentage
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Discount Percentage"
+                                    value={productAddFormik.values.discountpercentage}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.discountpercentage && productAddFormik.errors.discountpercentage && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.discountpercentage}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700 mb-1">Rating (0-5)</label>
+                                <input
+                                    id="rating"
+                                    name="rating"
+                                    type="number"
+                                    step="0.01"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.rating && productAddFormik.errors.rating
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Rating"
+                                    value={productAddFormik.values.rating}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.rating && productAddFormik.errors.rating && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.rating}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                                <input
+                                    id="stock"
+                                    name="stock"
+                                    type="number"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.stock && productAddFormik.errors.stock
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Stock"
+                                    value={productAddFormik.values.stock}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.stock && productAddFormik.errors.stock && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.stock}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                                <input
+                                    id="brand"
+                                    name="brand"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.brand && productAddFormik.errors.brand
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Brand"
+                                    value={productAddFormik.values.brand}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.brand && productAddFormik.errors.brand && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.brand}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="warrantyinformation" className="block text-sm font-medium text-gray-700 mb-1">Warranty Information</label>
+                                <input
+                                    id="warrantyinformation"
+                                    name="warrantyinformation"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.warrantyinformation && productAddFormik.errors.warrantyinformation
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Warranty Information"
+                                    value={productAddFormik.values.warrantyinformation}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.warrantyinformation && productAddFormik.errors.warrantyinformation && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.warrantyinformation}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="shippinginformation" className="block text-sm font-medium text-gray-700 mb-1">Shipping Information</label>
+                                <input
+                                    id="shippinginformation"
+                                    name="shippinginformation"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.shippinginformation && productAddFormik.errors.shippinginformation
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Shipping Information"
+                                    value={productAddFormik.values.shippinginformation}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.shippinginformation && productAddFormik.errors.shippinginformation && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.shippinginformation}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="availabilitystatus" className="block text-sm font-medium text-gray-700 mb-1">Availability Status</label>
+                                <input
+                                    id="availabilitystatus"
+                                    name="availabilitystatus"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.availabilitystatus && productAddFormik.errors.availabilitystatus
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Availability Status"
+                                    value={productAddFormik.values.availabilitystatus}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.availabilitystatus && productAddFormik.errors.availabilitystatus && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.availabilitystatus}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label htmlFor="returnpolicy" className="block text-sm font-medium text-gray-700 mb-1">Return Policy</label>
+                                <input
+                                    id="returnpolicy"
+                                    name="returnpolicy"
+                                    type="text"
+                                    className={`block w-full rounded-lg border ${productAddFormik.touched.returnpolicy && productAddFormik.errors.returnpolicy
+                                        ? 'border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-indigo-500'
+                                        } py-2 px-3 text-gray-900 focus:outline-none focus:ring-2`}
+                                    placeholder="Return Policy"
+                                    value={productAddFormik.values.returnpolicy}
+                                    onChange={productAddFormik.handleChange}
+                                    onBlur={productAddFormik.handleBlur}
+                                />
+                                {productAddFormik.touched.returnpolicy && productAddFormik.errors.returnpolicy && (
+                                    <p className="mt-1 text-sm text-red-600">{productAddFormik.errors.returnpolicy}</p>
+                                )}
+                            </div>
+                            <div>
+                                <button
+                                    type="submit"
+                                    disabled={productAddFormik.isSubmitting}
+                                    className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition duration-150 ease-in-out cursor-pointer disabled:opacity-70"
+                                >
+                                    {productAddFormik.isSubmitting ? "Adding Product..." : "Add Product"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* PRODUCT ADD MODAL END*/}
+
             {/* Mobile menu button */}
             <div className="md:hidden fixed top-4 left-4 z-50">
                 <button
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="p-2 rounded-md bg-indigo-600 text-white"
+                    className="p-2 rounded-md bg-indigo-600 text-white cursor-pointer"
                 >
                     {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
@@ -1014,7 +1411,7 @@ export default function AdminDashboard() {
 
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-y-auto p-6 w-full">
-                    {/* Dashboard/Home Page */}
+                    {/* DASHBOARD / HOME PAGE START*/}
                     {activePage === 'home' && (
                         <div className="space-y-6 w-full">
                             {/* Stats Cards */}
@@ -1108,18 +1505,17 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                             </div>
-
-
                         </div>
                     )}
+                    {/* DASHBOARD / HOME PAGE END*/}
 
-                    {/* Users Page */}
+                    {/* USERS PAGE START */}
                     {activePage === 'users' && (
                         <div className="bg-white rounded-xl shadow-sm overflow-hidden w-full">
                             <div className="p-6 border-b border-gray-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-bold text-gray-800">Users List</h3>
-                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsOpen(true)}>
+                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsUserAddModalOpen(true)}>
                                         Add New User
                                     </button>
                                 </div>
@@ -1137,7 +1533,7 @@ export default function AdminDashboard() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {currentUsers.map((user) => (
-                                            <tr className="hover:bg-gray-50" key={user.id}>
+                                            <tr className="hover:bg-gray-50">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center">
                                                         <div className="h-10 w-10 flex-shrink-0 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
@@ -1160,7 +1556,7 @@ export default function AdminDashboard() {
                                                             <Edit size={18} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteClick(user.id)}
+                                                            onClick={() => handleUserDeleteClick(user.id)}
                                                             className="text-red-600 hover:text-red-900 cursor-pointer">
                                                             <Trash2 size={18} />
                                                         </button>
@@ -1184,7 +1580,7 @@ export default function AdminDashboard() {
                                         disabled={currentUserPage === 1}
                                         className={`p-2 rounded-md border ${currentUserPage === 1
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'
+                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer'
                                             }`}
                                     >
                                         <ChevronLeft size={16} />
@@ -1195,7 +1591,7 @@ export default function AdminDashboard() {
                                         disabled={currentUserPage >= Math.ceil(users.length / itemsPerPage)}
                                         className={`p-2 rounded-md border ${currentUserPage >= Math.ceil(users.length / itemsPerPage)
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'
+                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer'
                                             }`}
                                     >
                                         <ChevronRight size={16} />
@@ -1204,36 +1600,17 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
+                    {/* USERS PAGE END */}
 
-                    {/* Products Page */}
+                    {/* PRODUCTS PAGE START */}
                     {activePage === 'products' && (
                         <div className="bg-white rounded-xl shadow-sm overflow-hidden w-full">
                             <div className="p-6 border-b border-gray-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-bold text-gray-800">Products List</h3>
-                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
+                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsProductAddModalOpen(true)}>
                                         Add New Product
                                     </button>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-4">
-                                    <div className="relative flex-1 min-w-64">
-                                        <input
-                                            type="text"
-                                            placeholder="Search products..."
-                                            className="pl-10 w-full pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                        />
-                                        <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                    </div>
-
-                                    <select className="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                                        <option value="">Filter by Category</option>
-                                        <option value="Electronics">Electronics</option>
-                                        <option value="Fashion">Fashion</option>
-                                        <option value="Kitchen">Kitchen</option>
-                                        <option value="Fitness">Fitness</option>
-                                        <option value="Home">Home</option>
-                                    </select>
                                 </div>
                             </div>
 
@@ -1255,12 +1632,11 @@ export default function AdminDashboard() {
                                                     <div className="flex items-center">
                                                         <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-gray-100 overflow-hidden">
                                                             <div className="h-full w-full flex items-center justify-center text-gray-500 text-xs">
-                                                                {/* Placeholder for product image */}
-                                                                <Package size={24} />
+                                                                <img src={product.thumbnail} alt={product.title} className="h-full w-full object-cover" />
                                                             </div>
                                                         </div>
                                                         <div className="ml-4">
-                                                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                                            <div className="text-sm font-medium text-gray-900">{product.title}</div>
                                                             <div className="text-sm text-gray-500">SKU: {product.sku}</div>
                                                         </div>
                                                     </div>
@@ -1270,7 +1646,7 @@ export default function AdminDashboard() {
                                                     <div className="text-sm text-gray-500">{product.category}</div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="text-sm font-medium text-gray-900">${product.price.toFixed(2)}</div>
+                                                    <div className="text-sm font-medium text-gray-900">${product.price}</div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${product.stock > 20
@@ -1284,12 +1660,12 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <div className="flex items-center gap-3">
-                                                        <button className="text-indigo-600 hover:text-indigo-900">
+                                                        <button className="text-indigo-600 hover:text-indigo-900 cursor-pointer">
                                                             <Edit size={18} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteProduct(product.id)}
-                                                            className="text-red-600 hover:text-red-900">
+                                                            onClick={() => handleProductDeleteClick(product.id)}
+                                                            className="text-red-600 hover:text-red-900 cursor-pointer">
                                                             <Trash2 size={18} />
                                                         </button>
                                                     </div>
@@ -1312,7 +1688,7 @@ export default function AdminDashboard() {
                                         disabled={currentProductPage === 1}
                                         className={`p-2 rounded-md border ${currentProductPage === 1
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'
+                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer'
                                             }`}
                                     >
                                         <ChevronLeft size={16} />
@@ -1323,7 +1699,7 @@ export default function AdminDashboard() {
                                         disabled={currentProductPage >= Math.ceil(products.length / itemsPerPage)}
                                         className={`p-2 rounded-md border ${currentProductPage >= Math.ceil(products.length / itemsPerPage)
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'
+                                            : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer'
                                             }`}
                                     >
                                         <ChevronRight size={16} />
@@ -1332,6 +1708,7 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
+                    {/* PRODUCTS PAGE END */}
                 </main>
             </div>
         </div >);

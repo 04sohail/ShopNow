@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { CartItem, LocationState, Product } from "../types/types";
+import { CartItem, LocationState, ProductDetails } from "../types/types";
 import { addCart } from "../redux/Slice";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -10,7 +10,7 @@ const ProductDetailsSection = (): React.ReactElement => {
     );
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const [product, setProduct] = useState<Product | null>(null);
+    const [product, setProduct] = useState<ProductDetails | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [selectedImage, setSelectedImage] = useState<string>("");
     const [quantity, setQuantity] = useState<number>(1);
@@ -198,7 +198,7 @@ const ProductDetailsSection = (): React.ReactElement => {
                                 {renderRatingStars(product.rating)}
                             </div>
                             <span className="text-gray-600 ml-1">
-                                {product.rating.toFixed(1)} Rating
+                                {product.rating} Rating
                             </span>
                             <span className="text-gray-400 mx-2">•</span>
                             <span className={`${product.stock > 10 ? 'text-green-600' : 'text-orange-600'} font-medium`}>
@@ -222,7 +222,7 @@ const ProductDetailsSection = (): React.ReactElement => {
                                 </>
                             ) : (
                                 <span className="title-font font-bold text-3xl text-gray-900">
-                                    ${product.price.toFixed(2)}
+                                    ${product.price}
                                 </span>
                             )}
                         </div>

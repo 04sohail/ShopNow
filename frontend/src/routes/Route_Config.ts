@@ -4,5 +4,6 @@ export const routesConfig = {
     product_details: '/landing_page/:id',
     cart: "/cart",
     auth: '/login',
-    random: '*'
+    random: '*',
+    demo: '/demo',
 };

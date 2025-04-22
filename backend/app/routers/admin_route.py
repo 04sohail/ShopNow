@@ -1,11 +1,16 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from ..schemas import SuccessResponse
+from ..schemas import SuccessResponse, ProductCreate, ProductUpdate
+from typing import List
 from ..models import user, inventory
+from ..models.product import Product
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from ..database.connection import get_db
 from ..schemas import Admin_User_Registration, Admin_edit_user
 from passlib.context import CryptContext
+from sqlalchemy.exc import IntegrityError
+import psycopg2
+import pprint
 
 router = APIRouter(prefix="/admin", )
 
@@ -42,7 +47,7 @@ def get_all_products(db: Session = Depends(get_db)):
     """
     try:
         # Fetch all products from the database
-        products = db.query(inventory.Inventory).all()
+        products = db.query(Product).all()
         if not products:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No products found")
 
@@ -111,7 +116,7 @@ def get_active_products(db: Session = Depends(get_db)):
     """
     try:
         # Fetch all active products from the database
-        active_products = db.query(inventory.Inventory).filter(inventory.Inventory.status == '1').all()
+        active_products = db.query(Product).filter(Product.status == '1').all()
         if not active_products:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active products found")
 
@@ -135,7 +140,7 @@ def get_inactive_products(db: Session = Depends(get_db)):
     """
     try:
         # Fetch all inactive products from the database
-        inactive_products = db.query(inventory.Inventory).filter(inventory.Inventory.status == '0').all()
+        inactive_products = db.query(Product).filter(Product.status == '0').all()
         if not inactive_products:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No inactive products found")
         # Return a success response with user info
@@ -261,33 +266,125 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
         print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
 # UPDATING USER BY ID
-@router.put("/user/{user_id}", description="This is used to update user by id", response_model=SuccessResponse, status_code=status.HTTP_200_OK)
+@router.put(
+    "/user/{user_id}",
+    description="This is used to update user by id",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_200_OK
+)
 def update_user(user_id: int, form_data: Admin_edit_user, db: Session = Depends(get_db)):
     """
-    This is used to update user by id.  
+    This is used to update user by id.
     """
     try:
-        # Fetch the user from the database
         user_data = db.query(user.User).filter(user.User.id == user_id).first()
         if not user_data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-        # Update the user data
         user_data.first_name = form_data.first_name
         user_data.last_name = form_data.last_name
         user_data.mobile_number = form_data.mobile_number
         user_data.email_address = form_data.email_address
         user_data.user_type = form_data.user_type
-
-        # Commit the changes to the database
         db.commit()
-
-        # Return a success response with updated user info
         return SuccessResponse(
             message="User updated successfully",
             data=user_data.info()
         )
 
+    except IntegrityError as e:
+        db.rollback()
+
+        if isinstance(e.orig, psycopg2.errors.UniqueViolation):
+            error_message = str(e.orig)
+            if "users_email_address_key" in error_message:
+                detail = "Email already exists"
+            elif "users_mobile_number_key" in error_message:
+                detail = "Mobile number already exists"
+            else:
+                detail = "Unique constraint violated"
+
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+        
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database integrity error")
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        db.rollback()
+        print("EXCEPTION", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+
+
+########## PRODUCTS API
+
+@router.post("/products/create", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
+def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    print(product)
+    try:
+        # Check if the product already exists by title
+        existing_product = db.query(Product).filter(Product.title == product.title).first()
+        if existing_product:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Product already exists")
+        last_product = db.query(Product).order_by(Product.id.desc()).first()
+        next_id = (last_product.id + 1) if last_product else 1
+        db_product = Product(**dict(product), sku=f"SKU{next_id}")
+        db.add(db_product)
+        db.commit()
+        db.refresh(db_product)
+        return SuccessResponse(
+            message="Product created successfully",
+            data=db_product.info()
+        )
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        pprint.pprint(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
+
+
+@router.get("/products/all", response_model=SuccessResponse, status_code=status.HTTP_200_OK)
+def read_products(db: Session = Depends(get_db)):
+    try:
+        products = db.query(Product).order_by(desc(Product.id)).all()
+        pprint.pprint(product.info() for product in products)
+        return SuccessResponse(
+            message="Products fetched successfully",
+            data=[product.info() for product in products]
+        )
     except Exception as e:
         print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
+    
+
+@router.get("/products/{id}", response_model=SuccessResponse)
+def read_product(id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == id).first()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return SuccessResponse(
+        message="Product fetched successfully",
+        data=product.info()
+    )
+
+@router.put("/products/{id}", response_model=SuccessResponse)
+def update_product(id: int, product: ProductUpdate, db: Session = Depends(get_db)):
+    db_product = db.query(Product).filter(Product.id == id).first()
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    update_data = product.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_product, key, value)
+    db.commit()
+    db.refresh(db_product)
+    return db_product
+
+@router.delete("/products/{id}", response_model=SuccessResponse)
+def delete_product(id: int, db: Session = Depends(get_db)):
+    db_product = db.query(Product).filter(Product.id == id).first()
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db.delete(db_product)
+    db.commit()
+    return SuccessResponse(
+        message="Product deleted successfully",
+    )

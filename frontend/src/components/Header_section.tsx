@@ -44,6 +44,7 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 w-full shadow-md z-50 bg-indigo-600 text-white">
+
       <div className="container mx-auto flex justify-between items-center h-20 px-4">
         {/* Logo Section */}
         <Link to="/">

@@ -9,11 +9,15 @@ import Product_details from '../pages/Product_details';
 import ShoppingCart from '../pages/ShoppingCart';
 import AuthPage from '../pages/Auth_Page';
 import AdminDashboard from '../pages/Admin';
+import ProductForm from '../pages/demo';
 
 const AppRoutes: React.FC = () => {
     return (
         <BrowserRouter>
             <Routes>
+                {/* DEMO ROUTE */}
+                <Route path={routesConfig.demo} element={<ProductForm />} />
+                {/* AUTH ROUTE */}
                 {/* Public Routes */}
                 <Route path={routesConfig.auth} element={<PublicRoute><AuthPage /></PublicRoute>} />
                 <Route path={routesConfig.cart} element={<ShoppingCart />} />

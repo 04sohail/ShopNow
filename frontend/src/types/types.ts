@@ -21,40 +21,6 @@ export interface User_Login_Context {
     user_type: string;
 }
 
-export interface Product {
-    id: number;
-    title: string;
-    description: string;
-    price: number;
-    discountPercentage: number;
-    rating: number;
-    stock: number;
-    brand: string;
-    category: string;
-    thumbnail: string;
-    images: string[];
-    dimensions: {
-        width: number;
-        height: number;
-        depth: number;
-    };
-    weight: number;
-    tags: string[];
-    availabilityStatus: string;
-    returnPolicy: string;
-    warrantyInformation: string;
-    shippingInformation: string;
-    minimumOrderQuantity: number;
-    meta: {
-        createdAt: string;
-        updatedAt: string;
-        barcode: string;
-        qrCode: string;
-    };
-    reviews: Review[];
-    sku: string;
-}
-
 export interface Review {
     reviewerName: string;
     rating: number;
@@ -62,20 +28,6 @@ export interface Review {
     date: string;
 }
 
-export interface CartItem {
-    id: number;
-    product: Product;
-    quantity: number;
-}
-
-export interface CartState {
-    carts: CartItem[];
-}
-
-export interface LocationState {
-    product?: Product;
-    from?: string;
-}
 
 export interface AdminUsers {
     id: number;
@@ -108,4 +60,43 @@ export interface UserResetPassword {
     email_address: string;
     new_password: string;
     confirm_password: string;
+}
+
+export interface ProductDetailsBody {
+    title: string;
+    description: string;
+    category: string;
+    price: string;
+    images: string[];
+    thumbnail: string;
+    discountpercentage: string;
+    rating: string;
+    stock: string;
+    brand: string;
+    warrantyinformation: string;
+    shippinginformation: string;
+    availabilitystatus: string;
+    returnpolicy: string;
+}
+
+export interface ProductDetails {
+    id: number;
+    title: string;
+    description: string;
+    category: string;
+    price: number;
+    images: string[];
+    thumbnail: string;
+    discountPercentage: number;
+    rating: number;
+    stock: number;
+    brand: string;
+    sku: string;
+    warrantyInformation: string;
+    shippingInformation: string;
+    availabilityStatus: string;
+    returnPolicy: string;
+    createdAt: string;
+    updatedAt: string;
+    status: string;
 }
