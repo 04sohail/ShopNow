@@ -35,6 +35,7 @@ export interface AdminUsers {
     last_name: string;
     mobile_number: number;
     email_address: string;
+    user_type: string;
 }
 export interface AdminUserRegistration {
     first_name: string;

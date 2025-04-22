@@ -24,14 +24,13 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { get_all_users, get_all_users_count, get_all_active_users, get_all_in_active_users, delete_user_by_id, add_new_user, get_user_by_id, update_user_by_id } from '../services/admin/user_controller';
 import { get_all_products_count, get_all_active_products, get_all_in_active_products, get_all_products, delete_product_by_id, add_new_product } from '../services/admin/products_controller';
 import { AdminUsers, ProductDetails, ProductDetailsBody } from '../types/types';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import { adminUpdateUserSchema, signupSchema, productAddSchema } from '../utils/validations';
 import { Bounce, toast, ToastContainer } from 'react-toastify';
 
 
 export default function AdminDashboard() {
-    // State variables
     // DASHBOARD SECTION
     const [users, setUsers] = useState<AdminUsers[]>([]);
     const [totalUser, setTotalUser] = useState(0);
@@ -42,6 +41,11 @@ export default function AdminDashboard() {
     const [inactiveProduct, setInactiveProduct] = useState(0);
     const [isDeleteModalOpen, setIsUserDeleteModalOpen] = useState(false);
 
+    // SORTING AND SEARCHING SECTION
+    const [originalUsers, setOriginalUsers] = useState<AdminUsers[]>([]);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [sortOption, setSortOption] = useState("");
+
     // ERROR SECTION
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -49,9 +53,10 @@ export default function AdminDashboard() {
     const [productToDelete, setProductToDelete] = useState<number | null>(null);
     const [showProductDeletedSuccessNotification, setShowProductDeletedSuccessNotification] = useState(false);
     const [showProductAddedSuccessNotification, setShowProductAddedSuccessNotification] = useState(false);
-    const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+    // const [showUpdateNotification, setShowUpdateNotification] = useState(false);
     const [isProductAddModalOpen, setIsProductAddModalOpen] = useState(false);
     const [isProductDeleteModalOpen, setIsProductDeleteModalOpen] = useState(false);
+
     // USER SECTION
     const [userToDelete, setUserToDelete] = useState<number | null>(null);
     const [showUserRegisteredSuccessNotification, setShowUserRegisteredSuccessNotification] = useState(false);
@@ -92,9 +97,10 @@ export default function AdminDashboard() {
             try {
                 const userResponse = await get_all_users();
                 setUsers(userResponse);
+                setOriginalUsers(userResponse);
 
                 const productResponse = await get_all_products();
-                setProducts(productResponse);
+                setProducts(productResponse.data.data);
 
                 const userCountResponse = await get_all_users_count();
                 setTotalUser(userCountResponse);
@@ -131,9 +137,10 @@ export default function AdminDashboard() {
 
             const userResponse = await get_all_users();
             setUsers(userResponse);
+            setOriginalUsers(userResponse);
 
             const productResponse = await get_all_products();
-            setProducts(productResponse);
+            setProducts(productResponse.data.data);
 
             const userCountResponse = await get_all_users_count();
             setTotalUser(userCountResponse);
@@ -423,6 +430,46 @@ export default function AdminDashboard() {
             updateFormik.handleSubmit();
         }, 0);
     };
+    // SEARCHING AND SORTING
+    const updateUsersList = (search: string, sort: string) => {
+        let filtered = [...originalUsers];
+
+        // Search
+        if (search) {
+            console.log("search", search);
+
+            const lowerSearch = search.toLowerCase();
+            filtered = filtered.filter(user =>
+                user.first_name.toLowerCase().includes(lowerSearch) ||
+                user.last_name.toLowerCase().includes(lowerSearch) ||
+                user.email_address.toLowerCase().includes(lowerSearch)
+            );
+        }
+
+        // Sort
+        if (sort === "ascending") {
+            filtered.sort((a, b) => a.first_name.localeCompare(b.first_name));
+        } else if (sort === "descending") {
+            filtered.sort((a, b) => b.first_name.localeCompare(a.first_name));
+        }
+
+        setUsers(filtered);
+    };
+
+    const handleSearchChange = (e: React.FormEvent) => {
+        const inputField = e.target as HTMLInputElement
+        const value = inputField.value;
+        setSearchTerm(value);
+        updateUsersList(value, sortOption);
+    };
+
+    const handleSortChange = (e: React.FormEvent) => {
+        const inputField = e.target as HTMLInputElement
+        const value = inputField.value;
+        setSortOption(value);
+        updateUsersList(searchTerm, value);
+    };
+
     // USERS SECTION END //////////////////////////////////////////////////////////////////////////////
 
     // PRODUCT SECTION START //////////////////////////////////////////////////////////////////////////////
@@ -430,7 +477,7 @@ export default function AdminDashboard() {
     const handleProductCloseNotification = () => {
         setShowProductDeletedSuccessNotification(false);
         setShowProductAddedSuccessNotification(false);
-        setShowUpdateNotification(false);
+        // setShowUpdateNotification(false);
     };
 
     // PRODUCTS ADD
@@ -468,7 +515,6 @@ export default function AdminDashboard() {
                         setShowProductAddedSuccessNotification(false);
                     }, 2000);
                 }
-
             } catch (error) {
                 console.error("Error during login:", error);
                 // Handle backend error messages
@@ -1009,14 +1055,13 @@ export default function AdminDashboard() {
             }
             {/* PRODUCT DELETE MODAL END */}
 
-
             {/* PRODUCT ADD MODAL START*/}
             {isProductAddModalOpen && (
                 <div className="fixed inset-0 bg-black-100 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-xs">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-screen overflow-y-auto p-5">
                         <div className="flex justify-between items-center p-4 border-b mb-5">
                             <h2 className="text-xl font-semibold text-gray-800">Add New Product Here</h2>
-                            <button onClick={handleProductCloseNotification} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                            <button onClick={() => setIsProductAddModalOpen(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">
                                 <X size={24} />
                             </button>
                         </div>
@@ -1337,12 +1382,12 @@ export default function AdminDashboard() {
             {/* Sidebar */}
             <div className={`bg-indigo-800 text-white w-64 shrink-0 ${mobileMenuOpen ? 'fixed z-40 h-full md:relative' : 'hidden md:block'}`}>
                 {/* Logo */}
-                <Link to="/admin" className="flex items-center gap-2 p-6 mb-8">
+                <div className="flex items-center gap-2 p-6 mb-8 cursor-pointer" onClick={() => setActivePage('home')}>
                     <div className="flex items-center gap-2 p-6 mb-8">
                         <ShoppingBag className="h-8 w-8" />
                         <h1 className="text-2xl font-bold">ShopNow Admin</h1>
                     </div>
-                </Link>
+                </div>
 
                 {/* Navigation */}
                 <nav className="px-4">
@@ -1409,11 +1454,11 @@ export default function AdminDashboard() {
                     </div>
                 </header>
 
-                {/* Main Content Area */}
+                {/* MAIN CONTENT AREA */}
                 <main className="flex-1 overflow-y-auto p-6 w-full">
                     {/* DASHBOARD / HOME PAGE START*/}
                     {activePage === 'home' && (
-                        <div className="space-y-6 w-full">
+                        <div className="space-y-6 w-full mt-12 mb-20">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-4 w-full">
@@ -1513,11 +1558,34 @@ export default function AdminDashboard() {
                     {activePage === 'users' && (
                         <div className="bg-white rounded-xl shadow-sm overflow-hidden w-full">
                             <div className="p-6 border-b border-gray-200">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-bold text-gray-800">Users List</h3>
-                                    <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer" onClick={() => setIsUserAddModalOpen(true)}>
-                                        Add New User
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        {/* Search */}
+                                        <input
+                                            type="text"
+                                            placeholder="Search Users"
+                                            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            onChange={handleSearchChange}
+                                        />
+
+                                        {/* Sort */}
+                                        <select
+                                            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            onChange={handleSortChange}
+                                        >
+                                            <option value="">Sort By</option>
+                                            <option value="ascending">First Name (A-Z)</option>
+                                            <option value="descending">First Name (Z-A)</option>
+                                        </select>
+
+                                        <button
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition cursor-pointer"
+                                            onClick={() => setIsUserAddModalOpen(true)}
+                                        >
+                                            Add New User
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1528,6 +1596,7 @@ export default function AdminDashboard() {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Type</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -1549,6 +1618,9 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="text-sm text-gray-900">{user.mobile_number}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm text-gray-900">{user.user_type}</div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <div className="flex items-center gap-3">
@@ -1709,6 +1781,17 @@ export default function AdminDashboard() {
                         </div>
                     )}
                     {/* PRODUCTS PAGE END */}
+                    <footer className="body-font">
+                        <div className="container px-5 py-8  flex justify-center align-center">
+                            <div className="flex items-center">
+                                <ShoppingBag className="h-8 w-8 ml-10 mr-1" />
+                                <h4 className="font-bold">ShopNow</h4>
+                                <p className="text-sm text-gray-500 sm:ml-4 sm:pl-4 sm:border-l-2 sm:border-gray-200 sm:py-2 sm:mt-0 mt-4">© 2025 Online Shopping —
+                                    <a href="https://twitter.com/knyttneve" className="text-gray-600 ml-1" rel="noopener noreferrer" target="_blank">@sohail</a>
+                                </p>
+                            </div>
+                        </div>
+                    </footer>
                 </main>
             </div>
         </div >);
