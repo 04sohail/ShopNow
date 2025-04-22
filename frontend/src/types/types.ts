@@ -35,6 +35,8 @@ export interface AdminUsers {
     last_name: string;
     mobile_number: number;
     email_address: string;
+    user_type: string;
+    created_at: string;
 }
 export interface AdminUserRegistration {
     first_name: string;
@@ -92,11 +94,29 @@ export interface ProductDetails {
     stock: number;
     brand: string;
     sku: string;
-    warrantyInformation: string;
-    shippingInformation: string;
-    availabilityStatus: string;
-    returnPolicy: string;
-    createdAt: string;
-    updatedAt: string;
+    warrantyinformation: string;
+    shippinginformation: string;
+    availabilitystatus: string;
+    returnpolicy: string;
+    created_at: string;
+    updated_at: string;
+    status: string;
+}
+
+export interface ProductUpdateBody {
+    title: string;
+    description: string;
+    category: string;
+    price: string;
+    images: string[];
+    thumbnail: string;
+    discountpercentage: string;
+    rating: string;
+    stock: string;
+    brand: string;
+    warrantyinformation: string;
+    shippinginformation: string;
+    availabilitystatus: string;
+    returnpolicy: string;
     status: string;
 }

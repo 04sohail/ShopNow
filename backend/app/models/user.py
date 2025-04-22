@@ -25,4 +25,5 @@ class User(Base):
             "email_address": self.email_address,
             "mobile_number": self.mobile_number,
             "user_type": self.user_type,
+            "created_at": self.created_at,
         }

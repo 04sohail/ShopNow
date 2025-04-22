@@ -49,7 +49,7 @@ const Header = () => {
         {/* Logo Section */}
         <Link to="/">
           <div className="flex items-center">
-            <ShoppingBag className="h-8 w-8 ml-10" />
+            <ShoppingBag className="h-8 w-8 ml-10 mr-1" />
             <h1 className="text-2xl font-bold">ShopNow</h1>
           </div>
         </Link>

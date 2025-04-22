@@ -61,3 +61,25 @@ export const add_new_product = async (data: ProductDetailsBody) => {
         throw error;
     }
 };
+// FUNCTION TO GET PRODUCT BY ID
+export const get_product_by_id = async (id: number) => {
+    try {
+        const response = await api.get(`admin/products/${id}`);
+        console.log("response from api", response);
+
+        return response;
+    } catch (error) {
+        console.error("Error fetching product:", error);
+        throw error;
+    }
+};
+// FUNCTION TO UPDATE PRODUCT BY ID
+export const update_product_by_id = async (id: number | null, data: ProductDetailsBody) => {
+    try {
+        const response = await api.put(`admin/products/${id}`, data);
+        return response;
+    } catch (error) {
+        console.error("Error updating product:", error);
+        throw error;
+    }
+}
