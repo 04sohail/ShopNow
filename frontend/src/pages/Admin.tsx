@@ -611,7 +611,6 @@ export default function AdminDashboard() {
                 }
             } catch (error) {
                 console.error("Error during login:", error);
-                // Handle backend error messages
                 if ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail) {
                     setSubmitError((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || "An unexpected error occurred.");
                 } else {
@@ -639,7 +638,8 @@ export default function AdminDashboard() {
             warrantyinformation: true,
             shippinginformation: true,
             availabilitystatus: true,
-            returnpolicy: true
+            returnpolicy: true,
+            status: true
         });
         setTimeout(() => {
             productUpdateFormik.handleSubmit();
@@ -665,7 +665,8 @@ export default function AdminDashboard() {
                 warrantyinformation: response.data.data.warrantyinformation,
                 shippinginformation: response.data.data.shippinginformation,
                 availabilitystatus: response.data.data.availabilitystatus,
-                returnpolicy: response.data.data.returnpolicy
+                returnpolicy: response.data.data.returnpolicy,
+                status: response.data.data.status
             });
         }
     };
@@ -1854,7 +1855,7 @@ export default function AdminDashboard() {
                                 >
                                     <option value="" disabled>Select Status</option>
                                     <option value="1">Active</option>
-                                    <option value="2">In-Active</option>
+                                    <option value="0">In-Active</option>
                                 </select>
                                 {productUpdateFormik.touched.status && productUpdateFormik.errors.status && (
                                     <p className="mt-1 text-sm text-red-600">{productUpdateFormik.errors.status}</p>
@@ -1874,13 +1875,6 @@ export default function AdminDashboard() {
                 </div>
             )}
             {/* PRODUCT UPDATE MODAL END*/}
-
-
-
-
-
-
-
 
             {/* Mobile menu button */}
             <div className="md:hidden fixed top-4 left-4 z-50">
@@ -2328,7 +2322,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center">
                                 <ShoppingBag className="h-8 w-8 ml-10 mr-1" />
                                 <h4 className="font-bold">ShopNow</h4>
-                                <p className="text-sm text-gray-500 sm:ml-4 sm:pl-4 sm:border-l-2 sm:border-gray-200 sm:py-2 sm:mt-0 mt-4">© 2025 Online Shopping —
+                                <p className="text-sm text-gray-500 sm:ml-4 sm:pl-4 sm:border-l-2 sm:border-gray-200 sm:py-2 sm:mt-0 mt-4">© 2025 ShopNow —
                                     <a href="https://twitter.com/knyttneve" className="text-gray-600 ml-1" rel="noopener noreferrer" target="_blank">@sohail</a>
                                 </p>
                             </div>

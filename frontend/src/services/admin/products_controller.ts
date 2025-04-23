@@ -75,6 +75,8 @@ export const get_product_by_id = async (id: number) => {
 };
 // FUNCTION TO UPDATE PRODUCT BY ID
 export const update_product_by_id = async (id: number | null, data: ProductDetailsBody) => {
+    console.log(data);
+    
     try {
         const response = await api.put(`admin/products/${id}`, data);
         return response;

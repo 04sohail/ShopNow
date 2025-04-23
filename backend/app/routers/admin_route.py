@@ -368,12 +368,28 @@ def update_product(id: int, product: ProductUpdate, db: Session = Depends(get_db
     db_product = db.query(Product).filter(Product.id == id).first()
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    update_data = product.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_product, key, value)
+    db_product.title = product.title
+    db_product.description = product.description
+    db_product.category = product.category
+    db_product.price = product.price
+    db_product.images = product.images
+    db_product.thumbnail = product.thumbnail
+    db_product.discountpercentage = product.discountpercentage
+    db_product.rating = product.rating
+    db_product.stock = product.stock
+    db_product.brand = product.brand
+    db_product.warrantyinformation = product.warrantyinformation
+    db_product.shippinginformation = product.shippinginformation
+    db_product.availabilitystatus = product.availabilitystatus
+    db_product.returnpolicy = product.returnpolicy
+    db_product.status = product.status
     db.commit()
     db.refresh(db_product)
-    return db_product
+    return SuccessResponse(
+        message="Product updated successfully",
+        data=db_product.info()
+    )
+
 
 @router.delete("/products/{id}", response_model=SuccessResponse)
 def delete_product(id: int, db: Session = Depends(get_db)):

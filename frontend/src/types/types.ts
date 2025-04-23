@@ -79,6 +79,7 @@ export interface ProductDetailsBody {
     shippinginformation: string;
     availabilitystatus: string;
     returnpolicy: string;
+    status: string;
 }
 
 export interface ProductDetails {
