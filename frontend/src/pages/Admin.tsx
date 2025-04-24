@@ -510,7 +510,8 @@ export default function AdminDashboard() {
         warrantyinformation: '',
         shippinginformation: '',
         availabilitystatus: '',
-        returnpolicy: ''
+        returnpolicy: '',
+        status: ''
     }
     const productAddFormik = useFormik({
         initialValues: productAddInitialValues,

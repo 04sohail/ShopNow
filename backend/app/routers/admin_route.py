@@ -10,7 +10,6 @@ from ..schemas import Admin_User_Registration, Admin_edit_user
 from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 import psycopg2
-import pprint
 
 router = APIRouter(prefix="/admin", )
 
@@ -316,7 +315,6 @@ def update_user(user_id: int, form_data: Admin_edit_user, db: Session = Depends(
 
 
 ########## PRODUCTS API
-
 @router.post("/products/create", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     try:
@@ -336,7 +334,6 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        pprint.pprint(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
 
 

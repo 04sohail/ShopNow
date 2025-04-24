@@ -8,7 +8,7 @@ export const get_all_users = async () => {
         const response = await api.get("/admin/users/all");
         return response.data.data.users;
     } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching all users:", error);
         throw error;
     }
 }
@@ -19,7 +19,7 @@ export const get_all_users_count = async () => {
         const response = await api.get("/admin/users/count");
         return response.data.data.user_count;
     } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching users count:", error);
         throw error;
     }
 };
@@ -29,7 +29,7 @@ export const get_all_active_users = async () => {
         const response = await api.get("/admin/active-users");
         return response.data.data.active_user_count;
     } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching active users count:", error);
         throw error;
     }
 };
@@ -39,7 +39,7 @@ export const get_all_in_active_users = async () => {
         const response = await api.get("/admin/inactive-users");
         return response.data.data.in_active_user_count;
     } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching in active users:", error);
         throw error;
     }
 };
@@ -70,7 +70,7 @@ export const get_user_by_id = async (userId: number) => {
         const response = await api.get(`/admin/user/${userId}`);
         return response.data.data;
     } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error("Error fetching single user:", error);
         throw error;
     }
 }

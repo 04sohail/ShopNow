@@ -1,13 +1,18 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Response
 from passlib.context import CryptContext
 from ..schemas import User_Registration, SuccessResponse, User_login, OtpSchema, GetUserByEmailAddress, ResetPassword
 from ..models import user
+from ..models.product import Product
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from ..database.connection import get_db
 from ..services.otp_service import generate_otp
 from ..services.email_service import send_otp_email
 from datetime import datetime, timezone, timedelta
 from ..config.environment_variables import SMTP_SERVER, SMTP_PORT_TLS, SMTP_PORT_SSL, EMAIL, PASSWORD
+from ..services.token_service import generate_token
+import os
+
 
 router = APIRouter(prefix="/users")
 
@@ -15,7 +20,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # REGISTERING USER
 @router.post("/register/", description="This is used to create new user or user registration", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
-def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
+async def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
     """Create a new user."""
     # Hashing the password
     try:
@@ -69,7 +74,7 @@ def create_user(form_data: User_Registration, db: Session = Depends(get_db)):
 
 # LOGIN USER
 @router.post("/login/", description="login", summary="login")
-def login_user(user_data: User_login, db: Session = Depends(get_db)):
+async def login_user(user_data: User_login, response:Response, db: Session = Depends(get_db), ):
     """
     Log in a user.
     """
@@ -102,15 +107,26 @@ def login_user(user_data: User_login, db: Session = Depends(get_db)):
             "email_address": data.email_address,
             "user_type": data.user_type,
         }
+
+        # Generating JWT Token
+        token = generate_token(data={"sub":data_dict["first_name"], "typ":data_dict["user_type"]})
+        print("TOKEN GENERATED =>", token)
+
+        # Setting JWT Token To Cookie
+        response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,  
+        secure=False,    
+        samesite="Lax",  
+        max_age=int(os.getenv("JWT_EXPIRATION")) * 60  
+        )
         return SuccessResponse(message="Logged In Successfully", data=data_dict)
     
     except HTTPException as http_exc:
-        # Log the error and re-raise the HTTP exception
         print(f"HTTPException: {http_exc.detail}")
         raise http_exc
-    
     except Exception as e:
-        # Catch all other exceptions
         print("Unexpected error:", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -215,3 +231,16 @@ async def reset_password(reset_form_data: ResetPassword, db: Session = Depends(g
     except Exception as e:
         print(e)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{str(e).split(':')[1].strip()}")
+
+# GETTING ALL PRODUCTS
+@router.get("/products/all", response_model=SuccessResponse, status_code=status.HTTP_200_OK)
+def read_products(db: Session = Depends(get_db)):
+    try:
+        products = db.query(Product).order_by(desc(Product.id)).all()
+        return SuccessResponse(
+            message="Products fetched successfully",
+            data=[product.info() for product in products]
+        )
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{e}")
