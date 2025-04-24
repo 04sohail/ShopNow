@@ -48,13 +48,11 @@ export default function AuthPage() {
   >("login");
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [otpSentSuccessfullyNotification, setOtpSentSuccessfullyNotification] = useState(false);
   const [passwordResetNotification, setPasswordResetNotification] = useState(false);
-  const [showOTPSuccessNotification, setShowOTPSuccessNotification] =
-    useState(false);
-  // Add this with your other state variables
-  const [otpPurpose, setOtpPurpose] = useState<"registration" | "password_reset">("registration");
   // OTP related states
+  const [showOTPSuccessNotification, setShowOTPSuccessNotification] = useState(false);
+  const [otpSentSuccessfullyNotification, setOtpSentSuccessfullyNotification] = useState(false);
+  const [otpPurpose, setOtpPurpose] = useState<"registration" | "password_reset">("registration");
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [verifying, setVerifying] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);

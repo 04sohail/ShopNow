@@ -7,7 +7,7 @@ export const get_all_products_count = async () => {
         const response = await api.get("/admin/products/count");
         return response.data.data.product_count;
     } catch (error) {
-        console.error("Error fetching users:", error);
+        console.error("Error fetching products count:", error);
         throw error;
     }
 };
@@ -34,7 +34,7 @@ export const get_all_in_active_products = async () => {
 // FUNCTION TO GET ALL PRODUCTS
 export const get_all_products = async () => {
     try {
-        const response = await api.get(`admin/products/all`);
+        const response = await api.get(`users/products/all`);
         return response;
     } catch (error) {
         console.error("Error fetching products:", error);
@@ -75,6 +75,8 @@ export const get_product_by_id = async (id: number) => {
 };
 // FUNCTION TO UPDATE PRODUCT BY ID
 export const update_product_by_id = async (id: number | null, data: ProductDetailsBody) => {
+    console.log(data);
+    
     try {
         const response = await api.put(`admin/products/${id}`, data);
         return response;

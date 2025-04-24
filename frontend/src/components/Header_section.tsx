@@ -32,11 +32,9 @@ const Header = () => {
         setIsProfileDropdownOpen(false);
       }
     };
-
     if (isProfileDropdownOpen) {
       document.addEventListener('mousedown', handleOutsideClick);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };

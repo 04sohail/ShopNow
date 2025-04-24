@@ -397,6 +397,7 @@ class ProductUpdate(ProductBase):
     rating: Optional[float] = Field(None, ge=0, le=5)
     stock: Optional[int] = Field(None, ge=0)
     brand: Optional[str] = Field(None, max_length=255)
+    sku: Optional[str] = Field(None, max_length=255)
     warrantyinformation: Optional[str] = None
     shippinginformation: Optional[str] = None
     availabilitystatus: Optional[str] = Field(None, max_length=255)
