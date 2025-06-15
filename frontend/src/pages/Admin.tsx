@@ -107,14 +107,6 @@ export default function AdminDashboard() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const userResponse = await get_all_users();
-                setUsers(userResponse);
-                setOriginalUsers(userResponse);
-
-                const productResponse = await get_all_products();
-                setProducts(productResponse.data.data);
-                setOriginalProducts(productResponse.data.data);
-
                 const userCountResponse = await get_all_users_count();
                 setTotalUser(userCountResponse);
 
@@ -1896,15 +1888,29 @@ export default function AdminDashboard() {
                         <h1 className="text-2xl font-bold">ShopNow Admin</h1>
                     </div>
                 </div>
-
                 {/* Navigation */}
                 <nav className="px-4">
                     <ul className="space-y-2">
                         {navItems.map((item) => (
                             <li key={item.id}>
                                 <button
-                                    onClick={() => {
-                                        setActivePage(item.id);
+                                    onClick={async () => {
+                                        if (item.id === 'users') {
+                                            setLoading(true);
+                                            const userResponse = await get_all_users();
+                                            setUsers(userResponse);
+                                            setOriginalUsers(userResponse);
+                                            setActivePage(item.id);
+                                        }
+                                        else if (item.id === 'products') {
+                                            setLoading(true);
+                                            const productResponse = await get_all_products();
+                                            setProducts(productResponse.data.data);
+                                            setOriginalProducts(productResponse.data.data);
+                                            setActivePage(item.id);
+                                        } else {
+                                            setActivePage(item.id);
+                                        }
                                         setMobileMenuOpen(false);
                                     }}
                                     className={`flex items-center gap-3 w-full p-3 rounded-lg transition-colors cursor-pointer ${activePage === item.id

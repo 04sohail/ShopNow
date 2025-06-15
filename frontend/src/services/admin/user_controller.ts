@@ -84,4 +84,4 @@ export const update_user_by_id = async (userId: number, userData: AdminUserUpdat
         console.error("Error updating user:", error);
         throw error;
     }
-}
+}   

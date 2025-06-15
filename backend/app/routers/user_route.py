@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Response
+import requests
 from passlib.context import CryptContext
 from ..schemas import User_Registration, SuccessResponse, User_login, OtpSchema, GetUserByEmailAddress, ResetPassword
 from ..models import user
@@ -10,7 +11,7 @@ from ..services.otp_service import generate_otp
 from ..services.email_service import send_otp_email
 from datetime import datetime, timezone, timedelta
 from ..config.environment_variables import SMTP_SERVER, SMTP_PORT_TLS, SMTP_PORT_SSL, EMAIL, PASSWORD
-from ..services.token_service import generate_token
+from ..services.token_service import generate_token, verify_token
 import os
 
 
@@ -109,17 +110,16 @@ async def login_user(user_data: User_login, response:Response, db: Session = Dep
         }
 
         # Generating JWT Token
-        token = generate_token(data={"sub":data_dict["first_name"], "typ":data_dict["user_type"]})
-        print("TOKEN GENERATED =>", token)
-
+        token = generate_token(data={"email":data_dict["email_address"]})
+        
         # Setting JWT Token To Cookie
         response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,  
-        secure=False,    
+        secure=False,
         samesite="Lax",  
-        max_age=int(os.getenv("JWT_EXPIRATION")) * 60  
+        max_age=2 * 60 * 60 
         )
         return SuccessResponse(message="Logged In Successfully", data=data_dict)
     
@@ -132,6 +132,55 @@ async def login_user(user_data: User_login, response:Response, db: Session = Dep
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again later."
         )
+
+# USER PROFILE
+@router.post("/profile/", description="Get user profile", summary="Get user profile")
+async def get_user_profile(db: Session = Depends(get_db)):
+    """
+    Get the profile of the logged-in user.
+    """
+    try:
+        session = requests.session()
+        response = session.get("http://localhost:8000/users/login/")
+        print("RESPONSE => ", response)
+        return response
+        # token = request.cookies.get("access_token")
+        # print("TOKEN => ",token)
+    #     if not token:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_401_UNAUTHORIZED,
+    #             detail="Access token is missing or invalid."
+    #         )
+    #     email = token.get("email")
+    #     print(token)
+    #     base_query = db.query(user.User).filter(user.User.email_address == email)
+    #     data = base_query.first()
+
+    #     if not data:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND, 
+    #             detail="User not found."
+    #         )
+
+    #     data_dict = {
+    #         "first_name": data.first_name,
+    #         "last_name": data.last_name,
+    #         "email_address": data.email_address,
+    #         "user_type": data.user_type,
+    #     }
+        
+    #     return SuccessResponse(message="User Profile Fetched Successfully", data=data_dict)
+
+    except HTTPException as http_exc:
+        print(f"HTTPException: {http_exc.detail}")
+        raise http_exc
+    except Exception as e:
+        print("Unexpected error:", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again later."
+        )
+
 
 @router.post("/verify-otp/", description="Verify OTP", summary="Verify OTP")
 def verify_otp(otp_data: OtpSchema, db: Session = Depends(get_db)):

@@ -5,7 +5,7 @@ from ..models import user, inventory
 from ..models.product import Product
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from ..database.connection import get_db
+from app.database.connection import get_db
 from ..schemas import Admin_User_Registration, Admin_edit_user
 from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
