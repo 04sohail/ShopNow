@@ -10,6 +10,9 @@ import ShoppingCart from '../pages/ShoppingCart';
 import AuthPage from '../pages/Auth_Page';
 import AdminDashboard from '../pages/Admin';
 import ProductForm from '../pages/demo';
+import Admin_users from '../pages/Admin_users';
+import Admin_products from '../pages/Admin_products';
+import Admin_home from '../pages/Admin_home';
 
 const AppRoutes: React.FC = () => {
     return (
@@ -41,6 +44,30 @@ const AppRoutes: React.FC = () => {
                     element={
                         <ProtectedRoute allowedRoles={['admin']}>
                             <AdminDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path={routesConfig['admin.home']}
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Admin_home />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path={routesConfig['admin.users']}
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Admin_users />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path={routesConfig['admin.products']}
+                    element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <Admin_products />
                         </ProtectedRoute>
                     }
                 />

@@ -15,20 +15,25 @@ EXPIRATION = os.getenv("JWT_EXPIRATION")
 
 # GETTING TOKEN
 def generate_token(data:dict):
+    print("DATA=>", data)
     try:
         to_encode = data.copy()
-        expire = datetime.now() + timedelta(minutes=int(EXPIRATION))
-        print("EXPIRY=>", expire)
+        expire = datetime.now() + timedelta(hours=int(EXPIRATION))
         to_encode.update({"exp":expire})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        # print("JWT=>", encoded_jwt)
+        print("EXPIRATION=>", expire)
+        # print("-"*30)
         return encoded_jwt
     except Exception as e:
         print(e)
+
 
 # VERIFYING TOKEN
 def verify_token(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print("PAYLOAD=>", payload)
         return payload
     except ExpiredSignatureError:
         raise HTTPException(
